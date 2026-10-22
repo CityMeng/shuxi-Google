@@ -1,0 +1,1602 @@
+{
+  "EVAL-0001": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0002": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0003": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0004": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0005": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0006": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0007": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0008": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0009": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0010": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0011": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0012": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0013": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0014": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0015": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0016": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0017": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0018": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0019": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0020": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0021": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0022": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0023": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0024": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0025": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0026": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0027": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0028": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0029": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0030": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0031": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0032": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0033": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0034": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0035": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0036": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0037": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0038": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0039": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0040": {
+    "expected_grade": "甲级",
+    "category": "原件基准",
+    "mutation": "原件原样未动"
+  },
+  "EVAL-0041": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0042": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0043": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0044": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0045": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0046": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0047": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0048": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0049": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0050": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0051": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0052": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0053": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0054": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0055": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0056": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0057": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0058": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0059": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0060": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0061": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0062": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0063": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0064": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0065": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0066": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0067": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0068": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0069": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0070": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0071": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0072": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0073": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0074": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0075": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0076": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0077": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0078": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0079": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0080": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0081": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0082": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0083": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0084": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0085": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0086": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0087": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0088": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0089": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0090": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0091": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0092": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0093": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0094": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0095": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0096": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0097": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0098": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "换行符转换为 CRLF"
+  },
+  "EVAL-0099": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "净利润数字转换为全角字符"
+  },
+  "EVAL-0100": {
+    "expected_grade": "乙级",
+    "category": "等价变换",
+    "mutation": "日期格式扩充空格排版"
+  },
+  "EVAL-0101": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4450000"
+  },
+  "EVAL-0102": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5100000"
+  },
+  "EVAL-0103": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4700000"
+  },
+  "EVAL-0104": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 4955000"
+  },
+  "EVAL-0105": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0106": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4500000"
+  },
+  "EVAL-0107": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4600000"
+  },
+  "EVAL-0108": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5055000"
+  },
+  "EVAL-0109": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0110": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5000000"
+  },
+  "EVAL-0111": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4500000"
+  },
+  "EVAL-0112": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 4755000"
+  },
+  "EVAL-0113": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4250000"
+  },
+  "EVAL-0114": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4500000"
+  },
+  "EVAL-0115": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4700000"
+  },
+  "EVAL-0116": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5655000"
+  },
+  "EVAL-0117": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4050000"
+  },
+  "EVAL-0118": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4500000"
+  },
+  "EVAL-0119": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4500000"
+  },
+  "EVAL-0120": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5555000"
+  },
+  "EVAL-0121": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4050000"
+  },
+  "EVAL-0122": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4500000"
+  },
+  "EVAL-0123": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 5200000"
+  },
+  "EVAL-0124": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5455000"
+  },
+  "EVAL-0125": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0126": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5100000"
+  },
+  "EVAL-0127": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4400000"
+  },
+  "EVAL-0128": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5255000"
+  },
+  "EVAL-0129": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4150000"
+  },
+  "EVAL-0130": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5100000"
+  },
+  "EVAL-0131": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4800000"
+  },
+  "EVAL-0132": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5455000"
+  },
+  "EVAL-0133": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0134": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4200000"
+  },
+  "EVAL-0135": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4500000"
+  },
+  "EVAL-0136": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 4955000"
+  },
+  "EVAL-0137": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4650000"
+  },
+  "EVAL-0138": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4300000"
+  },
+  "EVAL-0139": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4400000"
+  },
+  "EVAL-0140": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5655000"
+  },
+  "EVAL-0141": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4250000"
+  },
+  "EVAL-0142": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5000000"
+  },
+  "EVAL-0143": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 5100000"
+  },
+  "EVAL-0144": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5255000"
+  },
+  "EVAL-0145": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4050000"
+  },
+  "EVAL-0146": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4400000"
+  },
+  "EVAL-0147": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4900000"
+  },
+  "EVAL-0148": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5655000"
+  },
+  "EVAL-0149": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4550000"
+  },
+  "EVAL-0150": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4300000"
+  },
+  "EVAL-0151": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4900000"
+  },
+  "EVAL-0152": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5455000"
+  },
+  "EVAL-0153": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0154": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4400000"
+  },
+  "EVAL-0155": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4900000"
+  },
+  "EVAL-0156": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5555000"
+  },
+  "EVAL-0157": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4250000"
+  },
+  "EVAL-0158": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4200000"
+  },
+  "EVAL-0159": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4400000"
+  },
+  "EVAL-0160": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5255000"
+  },
+  "EVAL-0161": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4050000"
+  },
+  "EVAL-0162": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4600000"
+  },
+  "EVAL-0163": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 5100000"
+  },
+  "EVAL-0164": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5055000"
+  },
+  "EVAL-0165": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 3950000"
+  },
+  "EVAL-0166": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 4300000"
+  },
+  "EVAL-0167": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4200000 -> 4400000"
+  },
+  "EVAL-0168": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4655000 -> 5355000"
+  },
+  "EVAL-0169": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 3850000 -> 4250000"
+  },
+  "EVAL-0170": {
+    "expected_grade": "丁级",
+    "category": "字段篡改",
+    "mutation": "篡改净利润: 4100000 -> 5100000"
+  },
+  "EVAL-0171": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0172": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0173": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0174": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0175": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0176": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0177": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0178": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0179": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0180": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0181": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0182": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0183": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0184": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0185": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0186": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0187": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0188": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0189": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0190": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0191": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0192": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0193": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0194": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0195": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0196": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0197": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0198": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0199": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0200": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0201": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0202": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0203": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0204": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0205": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0206": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0207": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-03-31 -> 2025-12-31"
+  },
+  "EVAL-0208": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-06-30 -> 2025-12-31"
+  },
+  "EVAL-0209": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-09-30 -> 2025-12-31"
+  },
+  "EVAL-0210": {
+    "expected_grade": "丁级",
+    "category": "日期篡改",
+    "mutation": "篡改报告日期: 2026-12-31 -> 2025-12-31"
+  },
+  "EVAL-0211": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0212": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0213": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0214": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0215": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0216": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0217": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0218": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0219": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0220": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0221": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0222": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0223": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0224": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0225": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0226": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0227": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0228": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0229": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0230": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0231": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0232": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0233": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0234": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0235": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0236": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0237": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0238": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0239": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0240": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0241": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0242": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0243": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0244": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0245": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0246": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0247": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0248": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0249": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0250": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0251": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0252": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0253": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0254": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0255": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0256": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0257": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13000000 但分项之和为 12500000"
+  },
+  "EVAL-0258": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 13800000 但分项之和为 13300000"
+  },
+  "EVAL-0259": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 11500000 但分项之和为 11000000"
+  },
+  "EVAL-0260": {
+    "expected_grade": "丁级",
+    "category": "勾稽破坏",
+    "mutation": "破坏合计勾稽: 合计标为 12200000 但分项之和为 11700000"
+  },
+  "EVAL-0261": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0262": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0263": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0264": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0265": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0266": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0267": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0268": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0269": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0270": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0271": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0272": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0273": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0274": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0275": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0276": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0277": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0278": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0279": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0280": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0281": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0282": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0283": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0284": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0285": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0286": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0287": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0288": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0289": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0290": {
+    "expected_grade": "乙级",
+    "category": "扫描路径",
+    "mutation": "扫描件模拟尾部空白与轻微抖动"
+  },
+  "EVAL-0291": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0292": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0293": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0294": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0295": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0296": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0297": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0298": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0299": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0300": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0301": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0302": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0303": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0304": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0305": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0306": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0307": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0308": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0309": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0310": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0311": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0312": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0313": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0314": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0315": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0316": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0317": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0318": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0319": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  },
+  "EVAL-0320": {
+    "expected_grade": "待人工复核",
+    "category": "无关文档",
+    "mutation": "无关自由文本文件"
+  }
+}

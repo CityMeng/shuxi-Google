@@ -1,0 +1,412 @@
+[
+  {
+    "id": "VEC-HASH-01",
+    "category": "基础哈希",
+    "name": "SM3空串标准哈希",
+    "input": "",
+    "expected": "1ab21d8355cfa17f8e61194831e81a8f22bec8c728fefb747ed035eb5082aa2b"
+  },
+  {
+    "id": "VEC-HASH-02",
+    "category": "基础哈希",
+    "name": "SM3标准测试向量abc",
+    "input": "abc",
+    "expected": "66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0"
+  },
+  {
+    "id": "VEC-HASH-03",
+    "category": "基础哈希",
+    "name": "SHA256空串标准哈希",
+    "input": "",
+    "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "id": "VEC-HASH-04",
+    "category": "基础哈希",
+    "name": "SHA256标准测试向量abc",
+    "input": "abc",
+    "expected": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  {
+    "id": "VEC-HASH-05",
+    "category": "基础哈希",
+    "name": "SHA256中文数玺哈希",
+    "input": "数玺",
+    "expected": "acbbeeea2272dd9a162785cbd826e0181caf3e795f52ac48615ba1114d1043b3"
+  },
+  {
+    "id": "VEC-TREE-01",
+    "category": "Merkle树",
+    "name": "空树SHA256根为0x00空叶子哈希",
+    "expected": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+  },
+  {
+    "id": "VEC-TREE-02",
+    "category": "Merkle树",
+    "name": "空树SM3根为0x00空叶子哈希",
+    "expected": "2daef60e7a0b8f5e024c81cd2ab3109f2b4f155cf83adeb2ae5532f74a157fdf"
+  },
+  {
+    "id": "VEC-TREE-03",
+    "category": "Merkle树",
+    "name": "单叶子节点SHA256域前缀0x00",
+    "expected": "c18e2c9329d8a127460298c634d8734e1909ad8148c43704a4a15779f7d00bfe"
+  },
+  {
+    "id": "VEC-TREE-04",
+    "category": "Merkle树",
+    "name": "奇数叶子节点复制尾部补齐",
+    "is_valid": true
+  },
+  {
+    "id": "VEC-TREE-05",
+    "category": "Merkle树",
+    "name": "内部节点前缀0x01域分隔校验",
+    "is_valid": true
+  },
+  {
+    "id": "VEC-AMT-01",
+    "category": "金额规范化",
+    "raw": "¥50,000.00",
+    "expected": "50000"
+  },
+  {
+    "id": "VEC-AMT-02",
+    "category": "金额规范化",
+    "raw": "$12,345.67",
+    "expected": "12345.67"
+  },
+  {
+    "id": "VEC-AMT-03",
+    "category": "金额规范化",
+    "raw": "50万元",
+    "expected": "500000"
+  },
+  {
+    "id": "VEC-AMT-04",
+    "category": "金额规范化",
+    "raw": "2.5亿元",
+    "expected": "250000000"
+  },
+  {
+    "id": "VEC-AMT-05",
+    "category": "金额规范化",
+    "raw": "1.200.000",
+    "expected": "1200000"
+  },
+  {
+    "id": "VEC-AMT-06",
+    "category": "金额规范化",
+    "raw": "3.500.000元",
+    "expected": "3500000"
+  },
+  {
+    "id": "VEC-AMT-07",
+    "category": "金额规范化",
+    "raw": "-8,300,000元",
+    "expected": "-8300000"
+  },
+  {
+    "id": "VEC-AMT-08",
+    "category": "金额规范化",
+    "raw": "12.50%",
+    "expected": "12.5%"
+  },
+  {
+    "id": "VEC-AMT-09",
+    "category": "金额规范化",
+    "raw": "0.500%",
+    "expected": "0.5%"
+  },
+  {
+    "id": "VEC-AMT-10",
+    "category": "金额规范化",
+    "raw": "￥ 100 万元",
+    "expected": "1000000"
+  },
+  {
+    "id": "VEC-AMT-11",
+    "category": "金额规范化",
+    "raw": "486000.00元",
+    "expected": "486000"
+  },
+  {
+    "id": "VEC-AMT-12",
+    "category": "金额规范化",
+    "raw": "12500000",
+    "expected": "12500000"
+  },
+  {
+    "id": "VEC-AMT-13",
+    "category": "金额规范化",
+    "raw": "9000000元",
+    "expected": "9000000"
+  },
+  {
+    "id": "VEC-AMT-14",
+    "category": "金额规范化",
+    "raw": "3500000元",
+    "expected": "3500000"
+  },
+  {
+    "id": "VEC-AMT-15",
+    "category": "金额规范化",
+    "raw": "-15.00",
+    "expected": "-15"
+  },
+  {
+    "id": "VEC-DATE-01",
+    "category": "日期规范化",
+    "raw": "2026年9月30日",
+    "expected": "2026-09-30"
+  },
+  {
+    "id": "VEC-DATE-02",
+    "category": "日期规范化",
+    "raw": "2026 年 9 月 30 日",
+    "expected": "2026-09-30"
+  },
+  {
+    "id": "VEC-DATE-03",
+    "category": "日期规范化",
+    "raw": "2026/09/15",
+    "expected": "2026-09-15"
+  },
+  {
+    "id": "VEC-DATE-04",
+    "category": "日期规范化",
+    "raw": "2026-9-1",
+    "expected": "2026-09-01"
+  },
+  {
+    "id": "VEC-DATE-05",
+    "category": "日期规范化",
+    "raw": "2026.10.22",
+    "expected": "2026-10-22"
+  },
+  {
+    "id": "VEC-DATE-06",
+    "category": "日期规范化",
+    "raw": "2024年2月29日",
+    "expected": "2024-02-29"
+  },
+  {
+    "id": "VEC-DATE-07",
+    "category": "日期规范化",
+    "raw": "2026年2月29日",
+    "expected": null
+  },
+  {
+    "id": "VEC-DATE-08",
+    "category": "日期规范化",
+    "raw": "2026-13-01",
+    "expected": null
+  },
+  {
+    "id": "VEC-DATE-09",
+    "category": "日期规范化",
+    "raw": "2026-04-31",
+    "expected": null
+  },
+  {
+    "id": "VEC-DATE-10",
+    "category": "日期规范化",
+    "raw": "2026年12月31日",
+    "expected": "2026-12-31"
+  },
+  {
+    "id": "VEC-DUP-01",
+    "category": "重名字段",
+    "name": "重名字段按出现顺序依次编号",
+    "expected_keys": [
+      "合计",
+      "合计#2",
+      "合计#3"
+    ]
+  },
+  {
+    "id": "VEC-NORM-01",
+    "category": "文本规范化",
+    "name": "文字字段去首尾空白并将内部空白压缩为一格",
+    "input": "  示例  新能源   有限公司  ",
+    "expected": "示例 新能源 有限公司"
+  },
+  {
+    "id": "VEC-OCR-01",
+    "category": "OCR清洗",
+    "name": "分隔符混淆字丨与｜转为标准|",
+    "input": "产品销售收入丨9000000\n服务收入｜3500000",
+    "expected_count": 2
+  },
+  {
+    "id": "VEC-MULTILINE-01",
+    "category": "跨行提取",
+    "name": "标签独占一行数值在次行跨行抽取",
+    "input": "报告单位\n示例新能源有限公司",
+    "expected": [
+      "报告单位",
+      "示例新能源有限公司"
+    ]
+  },
+  {
+    "id": "VEC-SORT-01",
+    "category": "UTF8排序",
+    "name": "字段表严格按UTF-8字节序升序排列",
+    "check": true
+  },
+  {
+    "id": "VEC-AUDIT-G1-PASS",
+    "category": "勾稽审计",
+    "fields": [
+      [
+        "产品销售",
+        "9000000"
+      ],
+      [
+        "服务收入",
+        "3500000"
+      ],
+      [
+        "合计",
+        "12500000"
+      ]
+    ],
+    "expected_status": "PASS"
+  },
+  {
+    "id": "VEC-AUDIT-G1-FAIL",
+    "category": "勾稽审计",
+    "fields": [
+      [
+        "产品销售",
+        "9000000"
+      ],
+      [
+        "服务收入",
+        "3500000"
+      ],
+      [
+        "合计",
+        "13000000"
+      ]
+    ],
+    "expected_status": "FAIL"
+  },
+  {
+    "id": "VEC-AUDIT-G2-PASS",
+    "category": "勾稽审计",
+    "fields": [
+      [
+        "合同金额",
+        "500000"
+      ],
+      [
+        "金额大写",
+        "伍拾万元整"
+      ]
+    ],
+    "expected_status": "PASS"
+  },
+  {
+    "id": "VEC-AUDIT-G2-FAIL",
+    "category": "勾稽审计",
+    "fields": [
+      [
+        "合同金额",
+        "500000"
+      ],
+      [
+        "金额大写",
+        "肆拾捌万陆仟元整"
+      ]
+    ],
+    "expected_status": "FAIL"
+  },
+  {
+    "id": "VEC-AUDIT-G3-WARN",
+    "category": "勾稽审计",
+    "fields": [
+      [
+        "营业收入",
+        "12500000"
+      ],
+      [
+        "营业成本",
+        "8300000"
+      ],
+      [
+        "净利润",
+        "5800000"
+      ]
+    ],
+    "expected_status": "WARN"
+  },
+  {
+    "id": "VEC-PAIR-01",
+    "category": "成对判定",
+    "name": "report.txt原件验真",
+    "expected_grade": "甲级",
+    "expected_confidence": 99
+  },
+  {
+    "id": "VEC-PAIR-02",
+    "category": "成对判定",
+    "name": "report_tampered.txt篡改净利润验真",
+    "expected_grade": "丁级",
+    "tampered_field": "净利润",
+    "expected_registered": "4200000",
+    "expected_current": "5800000"
+  },
+  {
+    "id": "VEC-PAIR-03",
+    "category": "成对判定",
+    "name": "report_converted.txt转格式等价件验真",
+    "expected_grade": "乙级"
+  },
+  {
+    "id": "VEC-PAIR-04",
+    "category": "成对判定",
+    "name": "fake.txt未登记不平衡件审计",
+    "expected_grade": "丙级"
+  },
+  {
+    "id": "VEC-PAIR-05",
+    "category": "成对判定",
+    "name": "contract_bad.txt大写不符留痕登记后原件验真",
+    "expected_grade": "甲级"
+  },
+  {
+    "id": "VEC-PAIR-06",
+    "category": "成对判定",
+    "name": "scan_a与scan_b扫描互验感知等价",
+    "expected_passed": true
+  },
+  {
+    "id": "VEC-PAIR-07",
+    "category": "成对判定",
+    "name": "big.bin精确跨3分块无缝建树",
+    "expected_chunks": 3
+  },
+  {
+    "id": "VEC-PAIR-08",
+    "category": "成对判定",
+    "name": "无关文本对report登记验真不得判甲或乙",
+    "input_text": "这是一个完全无关的会议纪要备忘录，没有共同字段。",
+    "forbidden_grades": [
+      "甲级",
+      "乙级"
+    ]
+  },
+  {
+    "id": "VEC-PAIR-09",
+    "category": "成对判定",
+    "name": "选择性披露单个字段Merkle证明成立且其余字段隐匿",
+    "check": true
+  },
+  {
+    "id": "VEC-PAIR-10",
+    "category": "成对判定",
+    "name": "浮点数载荷拒绝序列化防御",
+    "check": true
+  }
+]

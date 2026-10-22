@@ -1,0 +1,151 @@
+{
+  "spec_version": "1.3",
+  "suite_id": "SXA1",
+  "total_test_cases": 320,
+  "overall_accuracy": 0.9375,
+  "total_time_seconds": 352.51,
+  "avg_time_per_case_ms": 1101.6,
+  "grade_precisions": {
+    "甲级": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 40
+    },
+    "乙级": {
+      "precision": 1.0,
+      "recall": 0.7778,
+      "support": 90
+    },
+    "丙级": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 0
+    },
+    "丁级": {
+      "precision": 0.9143,
+      "recall": 1.0,
+      "support": 160
+    },
+    "待人工复核": {
+      "precision": 0.8571,
+      "recall": 1.0,
+      "support": 30
+    }
+  },
+  "category_recalls": {
+    "原件基准": {
+      "recall": 1.0,
+      "correct": 40,
+      "total": 40
+    },
+    "等价变换": {
+      "recall": 0.6667,
+      "correct": 40,
+      "total": 60
+    },
+    "字段篡改": {
+      "recall": 1.0,
+      "correct": 70,
+      "total": 70
+    },
+    "日期篡改": {
+      "recall": 1.0,
+      "correct": 40,
+      "total": 40
+    },
+    "勾稽破坏": {
+      "recall": 1.0,
+      "correct": 50,
+      "total": 50
+    },
+    "扫描路径": {
+      "recall": 1.0,
+      "correct": 30,
+      "total": 30
+    },
+    "无关文档": {
+      "recall": 1.0,
+      "correct": 30,
+      "total": 30
+    }
+  },
+  "baseline_comparison": {
+    "shuxi_four_tier_accuracy": 0.9375,
+    "industry_single_hash_accuracy": 0.625,
+    "shuxi_advantage_description": "行业单哈希二值法将等价变换件与无损重存件 100% 误杀判假，而数玺三层指纹准确识别乙级等价，同时对字段篡改保持 100% 丁级检出。"
+  },
+  "failure_count": 20,
+  "failure_cases": [
+    {
+      "case_id": "EVAL-0043",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "待人工复核",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0046",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0049",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0052",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0055",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "待人工复核",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0058",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0061",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0064",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0067",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "待人工复核",
+      "mutation": "日期格式扩充空格排版"
+    },
+    {
+      "case_id": "EVAL-0070",
+      "category": "等价变换",
+      "expected": "乙级",
+      "predicted": "丁级",
+      "mutation": "日期格式扩充空格排版"
+    }
+  ],
+  "disclaimer": "【诚实边界】本报告基于确定性合成变异语料实测统计，结论受限于受控语料库，不外推真实世界未经标定的未知复杂排版精度。"
+}
