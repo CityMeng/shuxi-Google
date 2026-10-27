@@ -1,5 +1,5 @@
 /**
- * 数玺 · 密码学与哈希算法 (浏览器端对齐协议规范 v1.3)
+ * 数玺 · 密码学与哈希算法 (严格对齐《数玺协议规范 v1.3》§3、§4)
  */
 
 // SM3 国密算法实现
@@ -84,44 +84,6 @@ export function sm3Hash(data: Uint8Array): string {
   return v.map(x => x.toString(16).padStart(8, '0')).join('');
 }
 
-export async function sha256Hash(data: Uint8Array): Promise<string> {
-  const hashBuf = await crypto.subtle.digest('SHA-256', data as unknown as BufferSource);
-  const hashArr = Array.from(new Uint8Array(hashBuf));
-  return hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export function buildMerkleTreeSync(leafPayloads: Uint8Array[], isSm3: boolean): string {
-  if (leafPayloads.length === 0) {
-    return isSm3 ? sm3Hash(new Uint8Array([0x00])) : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-  }
-
-  // 叶子带 0x00 前缀
-  let current = leafPayloads.map(p => {
-    const prefixed = new Uint8Array(p.length + 1);
-    prefixed[0] = 0x00;
-    prefixed.set(p, 1);
-    return isSm3 ? sm3Hash(prefixed) : sm3Hash(prefixed); // Fallback string
-  });
-
-  while (current.length > 1) {
-    if (current.length % 2 !== 0) {
-      current.push(current[current.length - 1]);
-    }
-    const nextLevel: string[] = [];
-    for (let i = 0; i < current.length; i += 2) {
-      const leftBytes = hexToBytes(current[i]);
-      const rightBytes = hexToBytes(current[i + 1]);
-      const parentBuf = new Uint8Array(1 + leftBytes.length + rightBytes.length);
-      parentBuf[0] = 0x01;
-      parentBuf.set(leftBytes, 1);
-      parentBuf.set(rightBytes, 1 + leftBytes.length);
-      nextLevel.push(sm3Hash(parentBuf));
-    }
-    current = nextLevel;
-  }
-  return current[0];
-}
-
 export function hexToBytes(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < bytes.length; i++) {
@@ -130,6 +92,87 @@ export function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
+export async function sha256Hash(data: Uint8Array): Promise<string> {
+  const hashBuf = await crypto.subtle.digest('SHA-256', data as unknown as BufferSource);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Merkle 树精确计算 (对齐协议 §3: 256KB 分块，叶子域前缀 0x00，内部节点 0x01，奇数层尾节点自复制)
+ */
+export async function computeExactDualRoot(data: Uint8Array): Promise<{ sha256: string; sm3: string }> {
+  const CHUNK_SIZE = 256 * 1024;
+  const chunks: Uint8Array[] = [];
+  if (data.length === 0) {
+    const emptySha = await sha256Hash(new Uint8Array([0x00]));
+    const emptySm3 = sm3Hash(new Uint8Array([0x00]));
+    return { sha256: emptySha, sm3: emptySm3 };
+  }
+
+  for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+    chunks.push(data.subarray(i, Math.min(i + CHUNK_SIZE, data.length)));
+  }
+
+  // 1. SM3 Merkle Root
+  const sm3LeafHashes: Uint8Array[] = chunks.map(chunk => {
+    const leafBuf = new Uint8Array(1 + chunk.length);
+    leafBuf[0] = 0x00;
+    leafBuf.set(chunk, 1);
+    return hexToBytes(sm3Hash(leafBuf));
+  });
+
+  let sm3Level = sm3LeafHashes;
+  while (sm3Level.length > 1) {
+    if (sm3Level.length % 2 === 1) {
+      sm3Level.push(sm3Level[sm3Level.length - 1]);
+    }
+    const nextLevel: Uint8Array[] = [];
+    for (let i = 0; i < sm3Level.length; i += 2) {
+      const nodeBuf = new Uint8Array(1 + 32 + 32);
+      nodeBuf[0] = 0x01;
+      nodeBuf.set(sm3Level[i], 1);
+      nodeBuf.set(sm3Level[i + 1], 33);
+      nextLevel.push(hexToBytes(sm3Hash(nodeBuf)));
+    }
+    sm3Level = nextLevel;
+  }
+  const sm3Root = Array.from(sm3Level[0]).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  // 2. SHA-256 Merkle Root
+  const shaLeafHashes: Uint8Array[] = [];
+  for (const chunk of chunks) {
+    const leafBuf = new Uint8Array(1 + chunk.length);
+    leafBuf[0] = 0x00;
+    leafBuf.set(chunk, 1);
+    const h = await sha256Hash(leafBuf);
+    shaLeafHashes.push(hexToBytes(h));
+  }
+
+  let shaLevel = shaLeafHashes;
+  while (shaLevel.length > 1) {
+    if (shaLevel.length % 2 === 1) {
+      shaLevel.push(shaLevel[shaLevel.length - 1]);
+    }
+    const nextLevel: Uint8Array[] = [];
+    for (let i = 0; i < shaLevel.length; i += 2) {
+      const nodeBuf = new Uint8Array(1 + 32 + 32);
+      nodeBuf[0] = 0x01;
+      nodeBuf.set(shaLevel[i], 1);
+      nodeBuf.set(shaLevel[i + 1], 33);
+      const h = await sha256Hash(nodeBuf);
+      nextLevel.push(hexToBytes(h));
+    }
+    shaLevel = nextLevel;
+  }
+  const sha256Root = Array.from(shaLevel[0]).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return { sha256: sha256Root, sm3: sm3Root };
+}
+
+/**
+ * 感知层文本 3-gram 相似度 (对齐协议 §4: NFKC 归一化 -> 去空白 -> 转小写 -> 3-gram Jaccard)
+ */
 export function computeTextSimilarity(t1: string, t2: string): { score: number; formatted: string } {
   const clean = (s: string) => s.normalize('NFKC').replace(/\s+/g, '').toLowerCase();
   const c1 = clean(t1);
