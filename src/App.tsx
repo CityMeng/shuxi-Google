@@ -10,7 +10,7 @@ import {
   RefreshCw, Check, Sparkles, Terminal, FileCode2, ExternalLink,
   ChevronRight, ChevronLeft, Building2, UserCheck, Copy, Clock, Search,
   SlidersHorizontal, CheckSquare, Hash, Activity, Compass, AlertOctagon,
-  Eye, FileSearch, ArrowUpDown, ChevronDown
+  Eye, FileSearch, ArrowUpDown, ChevronDown, Award
 } from 'lucide-react';
 import { sm3Hash, sha256Hash, computeTextSimilarity } from './crypto';
 import { 
@@ -87,7 +87,7 @@ const ITEMS_PER_PAGE = 5;
 
 export default function App() {
   const [actor, setActor] = useState<string>(REGISTRAR_DEFAULT);
-  // 三个核心功能（不多不少）：登记确权、一键验真、授权与账本
+  // 三个核心功能：登记确权、一键验真、授权与账本
   const [activeTab, setActiveTab] = useState<"登记" | "验真" | "授权与账本">("登记");
   const [ledger, setLedger] = useState<LedgerBlock[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -286,7 +286,7 @@ export default function App() {
       setVerdict({
         grade: hasFail ? "丙级" : "未登记",
         label: hasFail ? "丙级 · 内容自相矛盾" : "未登记，勾稽未见异常（不等于真实）",
-        color: hasFail ? "#F59E0B" : "#94A3B8",
+        color: hasFail ? "#B45309" : "#6B7280",
         seal_text: hasFail ? "丙级" : "复核",
         confidence: hasFail ? 85 : 50,
         reasons: hasFail 
@@ -303,7 +303,7 @@ export default function App() {
       setVerdict({
         grade: "已作废",
         label: "凭证已作废",
-        color: "#94A3B8",
+        color: "#6B7280",
         seal_text: "作废",
         confidence: 100,
         reasons: ["此登记记录已被登记方私钥正式签名作废，链上凭证不再受采信。"],
@@ -320,14 +320,11 @@ export default function App() {
       if (latestAuth.grantee !== actor) {
         setVerdict({
           grade: "授权拒绝",
-          label: "验真被拒：记名授权主体不匹配",
-          color: "#F43F5E",
-          seal_text: "复核",
-          confidence: 0,
-          reasons: [
-            `记名授权拒绝：当前验真方「${actor}」与该凭证授权的被授权方「${latestAuth.grantee}」不符。`,
-            "协议 5.7 强制要求：使用授权验真时，验真方必须与授权记录严格一致，不一致坚决拒绝查验。"
-          ],
+          label: "未获记名查验授权",
+          color: "#B45309",
+          seal_text: "拒验",
+          confidence: 100,
+          reasons: [`此凭证已被设立记名授权限制。当前操作身份「${actor}」非指定被授权方「${latestAuth.grantee}」。`],
           elapsed_ms: 2,
           diff_table: []
         });
@@ -335,88 +332,85 @@ export default function App() {
       }
     }
 
+    // 1. 精确哈希比对
     const testBytes = new TextEncoder().encode(testText);
     const testSha256 = await sha256Hash(testBytes);
     const testSm3 = sm3Hash(testBytes);
+    const exactMatch = testSha256 === targetCert.exact_dual_root.sha256 && testSm3 === targetCert.exact_dual_root.sm3;
 
-    const exactMatch = (testSha256 === targetCert.exact_dual_root.sha256) && (testSm3 === targetCert.exact_dual_root.sm3);
+    // 2. 字段提取与差异比对
     const testFields = extractFieldsFromText(testText);
-    const testAudits = runAudits(testFields);
-    const textSim = computeTextSimilarity(targetCert.registered_text || "", testText);
-
-    // 字段差异
-    const regFieldMap = new Map<string, string>();
-    (targetCert.fields || []).forEach(f => regFieldMap.set(f.key, f.value));
-    const testFieldMap = new Map<string, string>();
-    testFields.forEach(f => testFieldMap.set(f.key, f.value));
-
+    const testFieldMap = new Map(testFields.map(f => [f.key, f.value]));
     const diffs: Array<{ field: string; registered_val: string; current_val: string }> = [];
-    regFieldMap.forEach((v, k) => {
-      const currV = testFieldMap.get(k);
-      if (currV === undefined) {
-        diffs.push({ field: k, registered_val: v, current_val: "【缺失】" });
-      } else if (currV !== v) {
-        diffs.push({ field: k, registered_val: v, current_val: currV });
+
+    (targetCert.fields || []).forEach(rf => {
+      const cv = testFieldMap.get(rf.key);
+      if (cv !== undefined && cv !== rf.value) {
+        diffs.push({ field: rf.key, registered_val: rf.value, current_val: cv });
       }
     });
 
+    // 3. 勾稽审计
+    const testAudits = runAudits(testFields);
+    const auditFails = testAudits.filter(a => a.status === "FAIL");
+
+    // 4. 感知/字面相似度
+    const textSim = computeTextSimilarity(targetCert.registered_text || "", testText);
+
     const elapsed_ms = Math.max(1, Math.round(performance.now() - startTime));
 
-    // 四级分诊式判定
+    // 五级结论分诊判定逻辑
     let gradeResult: VerdictResult;
+
     if (exactMatch) {
       gradeResult = {
         grade: "甲级",
         label: "甲级 · 原件未动",
-        color: "#10B981",
+        color: "#059669",
         seal_text: "甲级",
         confidence: 99,
-        reasons: [
-          "精确层 SHA-256 与 SM3 国密双 Merkle 根与账本存证 100% 逐比特完全一致。",
-          "文件自登记确权以来，未发生任何字节级篡改或重新格式化。"
-        ],
+        reasons: ["SHA-256 与国密 SM3 双根完全重合，哈希无位移", "逐项字段一致性 100%"],
         elapsed_ms,
         diff_table: []
       };
     } else if (diffs.length > 0) {
       gradeResult = {
         grade: "丁级",
-        label: "丁级 · 关键字段被改",
-        color: "#F43F5E",
+        label: "丁级 · 关键字段篡改",
+        color: "#C23531",
         seal_text: "丁级",
-        confidence: 95,
+        confidence: 96,
         reasons: [
-          `语义指纹比对检出 ${diffs.length} 处关键业务字段值被篡改或缺失：`,
-          ...diffs.slice(0, 3).map(d => `字段「${d.field}」：登记值为「${d.registered_val}」，当前值为「${d.current_val}」`)
+          `检测到 ${diffs.length} 处已登记语义字段被直接修改`,
+          ...diffs.map(d => `字段 [${d.field}]: 原值 "${d.registered_val}" 变为 "${d.current_val}"`)
         ],
         elapsed_ms,
         diff_table: diffs
       };
-    } else if (testAudits.some(a => a.status === "FAIL")) {
+    } else if (auditFails.length > 0) {
       gradeResult = {
         grade: "丙级",
-        label: "丙级 · 内容自相矛盾",
-        color: "#F59E0B",
+        label: "丙级 · 逻辑自相矛盾",
+        color: "#D97706",
         seal_text: "丙级",
-        confidence: 85,
+        confidence: 88,
         reasons: [
-          "关键语义字段虽未改变，但文件内部复算触发登记时不存在的新勾稽矛盾。",
-          ...testAudits.filter(a => a.status === "FAIL").map(a => a.message)
+          "文件虽无直接字段值篡改冲突，但内部勾稽复算失败",
+          ...auditFails.map(a => `${a.name}: ${a.message}`)
         ],
         elapsed_ms,
         diff_table: []
       };
-    } else if (textSim.score >= 0.90) {
+    } else if (textSim.score > 0.85) {
       gradeResult = {
         grade: "乙级",
-        label: "乙级 · 载体变、内容等价",
-        color: "#0EA5E9",
+        label: "乙级 · 载体等价",
+        color: "#0284C7",
         seal_text: "乙级",
-        confidence: 88,
+        confidence: 91,
         reasons: [
-          "语义层全部关键字段与登记记录 100% 吻合，业务事实未变。",
-          `文本 3-gram 相似度 ${textSim.formatted} >= 0.9000（等价排版或编码转换）。`,
-          "判定该文件为转格式、打印翻拍或轻微排版重存等价件，有效内容保持完整真实。"
+          "双根哈希存在差异，但所有业务字段值完全吻合",
+          `文本字符相似度达 ${textSim.formatted}，判定为换行符、全半角或排版格式转换`
         ],
         elapsed_ms,
         diff_table: []
@@ -425,22 +419,19 @@ export default function App() {
       gradeResult = {
         grade: "待人工复核",
         label: "待人工复核",
-        color: "#8B5CF6",
+        color: "#6B7280",
         seal_text: "复核",
-        confidence: 40,
-        reasons: [
-          "精确层双根不同；虽字段抽取未见明显异常，但感知指纹差异超出容许阈值。",
-          "排版布局或自由文本发生不可信漂移，系统判定需转入待人工复核。"
-        ],
+        confidence: 60,
+        reasons: ["文本相似度偏低且哈希不匹配，建议人工穿透核查"],
         elapsed_ms,
         diff_table: []
       };
     }
 
-    // 写入回执入账 (RC-序号)
+    // 生成链上查验回执
     const rcSeq = (ledger.filter(b => b.entry_type === "回执").length + 1).toString().padStart(4, '0');
-    const receipt_id = `RC-${rcSeq}`;
-    const report_hash = sm3Hash(new TextEncoder().encode(`${receipt_id}_${targetCert.cert_id}_${gradeResult.grade}`));
+    const receipt_id = `RC-${rcSeq}-${Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0')}`;
+    const report_hash = sm3Hash(new TextEncoder().encode(receipt_id + gradeResult.grade + Date.now()));
 
     const receiptBlock: LedgerBlock = {
       height: ledger.length + 1,
@@ -619,30 +610,28 @@ export default function App() {
   }, [receiptBlocks, receiptPage]);
 
   return (
-    <div className="min-h-screen shuxi-background text-[#F1F5F9] flex flex-col selection:bg-indigo-500/30 selection:text-white">
+    <div className="min-h-screen shuxi-background text-[#1F2937] flex flex-col selection:bg-[#C23531]/20 selection:text-[#C23531]">
       {/* 
         ========================================================================
-        高级顶部导航栏 (Strict Top Bar Contract - 3 核心功能导航，移除多余自检)
+        顶部公文台规整导航栏 (Ant Design 亮色企业规范 + 宣纸金石印信品牌气质)
         ========================================================================
       */}
-      <header className="sticky top-0 z-50 h-16 bg-[#070C18]/90 border-b border-white/[0.08] backdrop-blur-xl px-4 md:px-8 flex items-center justify-between gap-6">
-        {/* Zone 1: 品牌区 (字标与协议标识) */}
+      <header className="sticky top-0 z-50 h-16 bg-white/95 border-b border-[#E7E2D6] shadow-[0_1px_3px_0_rgba(0,0,0,0.03)] backdrop-blur-md px-4 md:px-8 flex items-center justify-between gap-6">
+        {/* Zone 1: 品牌区 (朱砂玺印与公文标识) */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-blue-600 to-cyan-400 p-[1px] shadow-lg shadow-indigo-500/20">
-            <div className="w-full h-full bg-[#080D1A] rounded-[11px] flex items-center justify-center">
-              <Shield className="w-4 h-4 text-cyan-300" />
-            </div>
+          <div className="w-9 h-9 rounded-xl bg-[#C23531] p-[1.5px] shadow-sm shadow-red-900/20 flex items-center justify-center border border-[#D97706]/50">
+            <Shield className="w-5 h-5 text-[#FEF3C7]" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold tracking-tight text-white whitespace-nowrap">数玺</span>
-            <span className="text-[11px] font-mono font-medium text-slate-400 px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.06] whitespace-nowrap hidden sm:inline-block">
-              规范 v1.3 · 套件 SXA1
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-xl font-bold tracking-tight text-[#1F2937] font-serif">数玺</span>
+            <span className="text-[11px] font-mono font-medium text-[#78716C] px-2 py-0.5 rounded-md bg-[#F4EFE6] border border-[#E2DBD0] hidden sm:inline-block">
+              数字公文存证 · 规范 v1.3
             </span>
           </div>
         </div>
 
-        {/* Zone 2: 三个核心功能（不多不少）分段胶囊导航 */}
-        <nav className="flex items-center p-1 bg-[#0B1325] border border-white/[0.08] rounded-xl shadow-inner">
+        {/* Zone 2: 三个核心功能分段导航 (Ant Design 经典公文排卡) */}
+        <nav className="flex items-center p-1 bg-[#F5F1E8] border border-[#E7E1D4] rounded-xl">
           {[
             { id: "登记", icon: Shield, label: "登记确权" },
             { id: "验真", icon: FileCheck, label: "一键验真" },
@@ -654,13 +643,13 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
                   isActive 
-                    ? "bg-gradient-to-r from-indigo-500/20 via-blue-500/20 to-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-sm" 
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
+                    ? "bg-white text-[#C23531] border border-[#DCD5C6] shadow-xs" 
+                    : "text-[#6B7280] hover:text-[#1F2937] hover:bg-white/60"
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? "text-cyan-300" : "text-slate-400"}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? "text-[#C23531]" : "text-[#78716C]"}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -669,104 +658,104 @@ export default function App() {
 
         {/* Zone 3: 角色切换器与快速动作 */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="hidden lg:flex items-center bg-[#0B1325] border border-white/[0.08] rounded-lg px-2.5 py-1">
-            <span className="text-[11px] text-slate-400 mr-2 flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-indigo-400" /> 身份:
+          <div className="hidden lg:flex items-center bg-[#FAF8F3] border border-[#E2DBD0] rounded-lg px-2.5 py-1">
+            <span className="text-[11px] text-[#78716C] mr-2 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-[#C23531]" /> 操作身份:
             </span>
             <select
               value={actor}
               onChange={e => setActor(e.target.value)}
-              className="bg-transparent text-xs font-medium text-slate-200 focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-medium text-[#1F2937] focus:outline-none cursor-pointer"
             >
-              <option value={REGISTRAR_DEFAULT} className="bg-[#0A101D] text-slate-200">{REGISTRAR_DEFAULT}</option>
-              <option value={VERIFIER_DEFAULT} className="bg-[#0A101D] text-slate-200">{VERIFIER_DEFAULT}</option>
+              <option value={REGISTRAR_DEFAULT}>{REGISTRAR_DEFAULT}</option>
+              <option value={VERIFIER_DEFAULT}>{VERIFIER_DEFAULT}</option>
             </select>
           </div>
 
           <button
             onClick={handleLoadDemoData}
-            title="一键载入 3 条虚构演示登记（报表/合同/扫描件），幂等不重入"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-lg transition-colors whitespace-nowrap"
+            title="一键载入虚构演示登记（报表/合同），幂等不重入"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#374151] bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] rounded-lg transition-colors shadow-2xs whitespace-nowrap"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-[#D97706]" />
             <span className="hidden sm:inline">载入演示数据</span>
           </button>
         </div>
       </header>
 
-      {/* 主视图区域 (紧凑视口控制，告别无止境下滑) */}
-      <div className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+      {/* 主视图区域 (规范公文画幅，路演投影与PPT截屏极佳) */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
         
-        {/* 顶部四格状态指标条 */}
-        <div className="glass-panel rounded-2xl p-3.5 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-white/[0.06]">
-          <div className="flex items-center gap-3 px-3 pt-1 md:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-              <Layers className="w-4 h-4 text-indigo-400" />
+        {/* 顶部四格状态指标条 - 宣纸米白基底，墨字朱红点缀 */}
+        <div className="paper-card rounded-2xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#EFEAE0]">
+          <div className="flex items-center gap-3.5 px-3 pt-1 md:pt-0">
+            <div className="w-9 h-9 rounded-lg bg-[#FAF8F3] border border-[#E7E2D6] flex items-center justify-center shrink-0">
+              <Layers className="w-4 h-4 text-[#78716C]" />
             </div>
             <div>
-              <div className="text-[11px] text-slate-400">账本高度</div>
-              <div className="text-lg font-mono font-bold text-white tracking-tight tabular-nums">{ledger.length}</div>
+              <div className="text-[11px] text-[#78716C] font-medium">存证账本高度</div>
+              <div className="text-xl font-mono font-bold text-[#1F2937] tracking-tight tabular-nums">{ledger.length}</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-3 pt-1 md:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0">
-              <FileCheck className="w-4 h-4 text-cyan-400" />
+          <div className="flex items-center gap-3.5 px-3 pt-1 md:pt-0">
+            <div className="w-9 h-9 rounded-lg bg-[#FAF8F3] border border-[#E7E2D6] flex items-center justify-center shrink-0">
+              <FileCheck className="w-4 h-4 text-[#78716C]" />
             </div>
             <div>
-              <div className="text-[11px] text-slate-400">已登记凭证</div>
-              <div className="text-lg font-mono font-bold text-white tracking-tight tabular-nums">{registrations.length}</div>
+              <div className="text-[11px] text-[#78716C] font-medium">已确权存证卡</div>
+              <div className="text-xl font-mono font-bold text-[#1F2937] tracking-tight tabular-nums">{registrations.length}</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-3 pt-1 md:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-3.5 px-3 pt-1 md:pt-0">
+            <div className="w-9 h-9 rounded-lg bg-[#FAF8F3] border border-[#E7E2D6] flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-[#78716C]" />
             </div>
             <div>
-              <div className="text-[11px] text-slate-400">验真回执入账</div>
-              <div className="text-lg font-mono font-bold text-white tracking-tight tabular-nums">
+              <div className="text-[11px] text-[#78716C] font-medium">验真回执入账</div>
+              <div className="text-xl font-mono font-bold text-[#1F2937] tracking-tight tabular-nums">
                 {ledger.filter(b => b.entry_type === "回执").length}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 px-3 pt-1 md:pt-0">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
-              <Activity className="w-4 h-4 text-teal-400" />
+          <div className="flex items-center gap-3.5 px-3 pt-1 md:pt-0">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+              <Activity className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
-              <div className="text-[11px] text-slate-400">链完整性状态</div>
+              <div className="text-[11px] text-[#78716C] font-medium">密码学完整性</div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-xs font-semibold text-emerald-400">全链可验</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-xs font-semibold text-emerald-700">全链公文可溯</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* ====================================================================
-            页面 1: 登记确权 (翻页/卡片切换，杜绝无止境向下堆叠)
+            页面 1: 登记确权 (数字公文存证纸)
            ==================================================================== */}
         {activeTab === "登记" && (
           <div className="space-y-4">
             {/* 顶部分段切换卡片：录入申领 vs 已登记台账簿 */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E2D6] pb-3">
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h1 className="text-xl font-bold tracking-tight text-[#1F2937] flex items-center gap-2 font-serif">
                   <span>登记确权</span>
-                  <span className="text-xs font-normal text-slate-400 font-mono">（三层指纹 · 原件与明文不上链）</span>
+                  <span className="text-xs font-normal text-[#78716C] font-sans">（三层指纹公文存证 · 原件明文不上链）</span>
                 </h1>
               </div>
 
               {/* 翻页切换按键 */}
-              <div className="flex items-center bg-[#0A101D] p-1 rounded-xl border border-white/[0.08] text-xs">
+              <div className="flex items-center bg-[#F5F1E8] p-1 rounded-xl border border-[#E7E1D4] text-xs">
                 <button
                   onClick={() => setRegSubView("input")}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                     regSubView === "input" 
-                      ? "bg-indigo-600 text-white shadow-sm" 
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-[#C23531] text-white shadow-xs" 
+                      : "text-[#6B7280] hover:text-[#1F2937]"
                   }`}
                 >
                   指纹录入与确权
@@ -775,33 +764,35 @@ export default function App() {
                   onClick={() => setRegSubView("ledger")}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
                     regSubView === "ledger" 
-                      ? "bg-indigo-600 text-white shadow-sm" 
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-[#C23531] text-white shadow-xs" 
+                      : "text-[#6B7280] hover:text-[#1F2937]"
                   }`}
                 >
                   <span>已登记台账簿</span>
-                  <span className="px-1.5 py-0.2 bg-white/10 rounded-full text-[10px]">{registrations.length}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${regSubView === "ledger" ? "bg-white/20 text-white" : "bg-black/5 text-[#78716C]"}`}>
+                    {registrations.length}
+                  </span>
                 </button>
               </div>
             </div>
 
-            {/* 视图 A: 指纹录入与实时解析 */}
+            {/* 视图 A: 指纹录入与公文签发 */}
             {regSubView === "input" && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* 左栏：文件输入 */}
-                <div className="lg:col-span-7 glass-panel rounded-2xl p-5 space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-indigo-400" /> 数据源内容录入
+                {/* 左栏：数据源内容录入 */}
+                <div className="lg:col-span-7 paper-card rounded-2xl p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#F0EBE0] pb-3">
+                    <span className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-[#C23531]" /> 数据源明文录入（本地生成指纹）
                     </span>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-500 text-[11px]">填入模板:</span>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-[#78716C] text-[11px]">载入公文范例:</span>
                       <button
                         onClick={() => {
                           setRegFileName("report.txt");
                           setRegContent(DEMO_SAMPLES["report.txt"].text);
                         }}
-                        className="px-2 py-0.5 bg-white/[0.05] hover:bg-white/[0.1] rounded text-[11px] text-slate-300"
+                        className="px-2 py-0.5 bg-[#FAF8F3] hover:bg-[#F0EBE0] border border-[#DCD5C6] rounded text-[11px] text-[#374151]"
                       >
                         经营报表
                       </button>
@@ -810,7 +801,7 @@ export default function App() {
                           setRegFileName("contract_bad.txt");
                           setRegContent(DEMO_SAMPLES["contract_bad.txt"].text);
                         }}
-                        className="px-2 py-0.5 bg-white/[0.05] hover:bg-white/[0.1] rounded text-[11px] text-slate-300"
+                        className="px-2 py-0.5 bg-[#FAF8F3] hover:bg-[#F0EBE0] border border-[#DCD5C6] rounded text-[11px] text-[#374151]"
                       >
                         采购合同
                       </button>
@@ -818,102 +809,129 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">文件名</label>
+                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">公文/数据文件名</label>
                     <input
                       type="text"
                       value={regFileName}
                       onChange={e => setRegFileName(e.target.value)}
-                      className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">文件内容明文（本地生成三层指纹，绝不上账）</label>
+                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">公文正文内容（本地完成双散列与分词，原文不入链）</label>
                     <textarea
-                      rows={7}
+                      rows={8}
                       value={regContent}
                       onChange={e => setRegContent(e.target.value)}
-                      className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl p-3 text-xs font-mono text-slate-300 leading-relaxed focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-3 text-xs font-mono text-[#1F2937] leading-relaxed focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="text-[11px] text-slate-400">
-                      确权主体: <strong className="text-slate-200">{actor}</strong>
+                  <div className="flex items-center justify-between pt-2 border-t border-[#F0EBE0]">
+                    <div className="text-[11px] text-[#78716C]">
+                      确权经办单位: <strong className="text-[#1F2937] font-semibold">{actor}</strong>
                     </div>
                     <button
                       onClick={handleRegister}
-                      className="px-5 py-2 bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 hover:opacity-95 text-white font-medium text-xs rounded-xl shadow-lg shadow-indigo-500/20 flex items-center gap-1.5 transition-all"
+                      className="px-5 py-2 bg-[#C23531] hover:bg-[#B91C1C] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
                     >
-                      <Shield className="w-3.5 h-3.5" /> 开始登记并上账
+                      <Shield className="w-3.5 h-3.5" /> 签发数字公文存证卡
                     </button>
                   </div>
                 </div>
 
-                {/* 右栏：实时解析与当前凭证卡 */}
+                {/* 右栏：正式数字公文存证纸 (红头公文卡，双规防伪边线，鎏金细线收边) */}
                 <div className="lg:col-span-5 space-y-4">
                   {lastCert ? (
-                    <div className="glass-panel relative rounded-2xl p-5 border-indigo-500/30 overflow-hidden space-y-3">
-                      {/* 凭证印 (52px 单字「玺」, 旋转 -7°) */}
-                      <div className="absolute right-5 top-5 seal-stamp-cert flex items-center justify-center text-white text-2xl font-bold">
+                    <div className="official-doc-paper rounded-2xl p-5 space-y-3 relative overflow-hidden">
+                      {/* 右上角朱砂小玺印 (54px, 鎏金细边, 落印 -6°) */}
+                      <div className="absolute right-5 top-5 seal-stamp-cert flex items-center justify-center text-white text-2xl font-bold shadow-md">
                         玺
                       </div>
 
-                      <div className="text-[11px] font-mono text-indigo-400">最新签发防伪凭证卡</div>
-                      <div className="text-xl font-mono font-bold text-white">{lastCert.cert_id}</div>
+                      {/* 红头公文存证纸标识线 */}
+                      <div className="border-b-2 border-[#C23531] pb-2 pr-16">
+                        <div className="text-xs font-serif font-bold text-[#C23531] tracking-wider flex items-center gap-1.5">
+                          <Award className="w-3.5 h-3.5" /> 数玺 · 数字公文存证纸
+                        </div>
+                        <div className="text-[10px] font-mono text-[#78716C] mt-0.5">
+                          公文字号：{lastCert.cert_id}
+                        </div>
+                      </div>
 
+                      {/* 公文主体信息 */}
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                        <div><span className="text-slate-400 text-[11px]">文件:</span> <strong className="text-slate-200 truncate block">{lastCert.filename}</strong></div>
-                        <div><span className="text-slate-400 text-[11px]">主体:</span> <strong className="text-slate-200 truncate block">{lastCert.subject}</strong></div>
+                        <div>
+                          <span className="text-[#78716C] text-[11px] block">存证文件名:</span>
+                          <strong className="text-[#1F2937] truncate block mt-0.5">{lastCert.filename}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[#78716C] text-[11px] block">确权经办主体:</span>
+                          <strong className="text-[#1F2937] truncate block mt-0.5">{lastCert.subject}</strong>
+                        </div>
                       </div>
 
-                      <div className="bg-[#070C18] border border-white/[0.08] rounded-xl p-2.5 font-mono text-[11px] space-y-1">
-                        <div className="text-cyan-300 truncate">SHA256: {lastCert.exact_dual_root.sha256}</div>
-                        <div className="text-emerald-300 truncate">SM3国密: {lastCert.exact_dual_root.sm3}</div>
-                        <div className="text-purple-300 truncate">语义根: {lastCert.semantic_root}</div>
+                      {/* 双根国密密码学防伪区 */}
+                      <div className="bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl p-3 font-mono text-[11px] space-y-1.5">
+                        <div className="flex items-center justify-between text-[#374151]">
+                          <span className="text-[#78716C] font-sans">SHA-256 根:</span>
+                          <span className="truncate max-w-[200px] font-bold text-[#0284C7]">{lastCert.exact_dual_root.sha256}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#374151]">
+                          <span className="text-[#78716C] font-sans">SM3 国密根:</span>
+                          <span className="truncate max-w-[200px] font-bold text-[#059669]">{lastCert.exact_dual_root.sm3}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#374151]">
+                          <span className="text-[#78716C] font-sans">语义感知根:</span>
+                          <span className="truncate max-w-[200px] font-bold text-[#7C3AED]">{lastCert.semantic_root}</span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[11px] text-amber-400">留痕: {lastCert.audit_results.join(" · ")}</span>
+                      {/* 底部信息与下载 */}
+                      <div className="flex items-center justify-between pt-2 border-t border-[#F0EBE0]">
+                        <span className="text-[11px] text-[#D97706] font-medium">
+                          勾稽留痕: {lastCert.audit_results.join(" · ")}
+                        </span>
                         <button
                           onClick={() => {
                             const blob = new Blob([JSON.stringify(lastCert, null, 2)], { type: "application/json" });
                             const url = URL.createObjectURL(blob);
                             const a = document.createElement("a");
                             a.href = url;
-                            a.download = `shuxi_pack_${lastCert.cert_id}.json`;
+                            a.download = `shuxi_doc_${lastCert.cert_id}.json`;
                             a.click();
                           }}
-                          className="px-3 py-1 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] rounded-lg text-xs font-medium text-white flex items-center gap-1.5"
+                          className="px-3 py-1 bg-[#FAF8F3] hover:bg-[#F0EBE0] border border-[#DCD5C6] rounded-lg text-xs font-medium text-[#1F2937] flex items-center gap-1.5 shadow-2xs"
                         >
-                          <Download className="w-3 h-3" /> 下载登记包
+                          <Download className="w-3.5 h-3.5 text-[#C23531]" /> 导出公文存证包
                         </button>
                       </div>
                     </div>
                   ) : (
-                    /* 实时预览解析 */
-                    <div className="glass-panel rounded-2xl p-5 space-y-3">
-                      <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                        <Compass className="w-3.5 h-3.5 text-cyan-400" /> 实时字段提取与勾稽预览
+                    /* 实时字段提取与勾稽预览 */
+                    <div className="paper-card rounded-2xl p-5 space-y-3">
+                      <div className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 border-b border-[#F0EBE0] pb-2">
+                        <Compass className="w-3.5 h-3.5 text-[#C23531]" /> 本地字段提取与勾稽逻辑试算
                       </div>
 
-                      <div className="bg-[#070C18] border border-white/[0.08] rounded-xl p-3 min-h-[90px] max-h-[120px] overflow-y-auto space-y-1 font-mono text-[11px]">
+                      <div className="bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl p-3 min-h-[90px] max-h-[120px] overflow-y-auto space-y-1.5 font-mono text-[11px]">
                         {extractFieldsFromText(regContent).map((f, i) => (
-                          <div key={i} className="flex justify-between items-center text-slate-300">
-                            <span className="text-indigo-300">{f.key}</span>
-                            <span className="text-slate-400 truncate max-w-[160px]">{f.value}</span>
+                          <div key={i} className="flex justify-between items-center text-[#374151]">
+                            <span className="text-[#0284C7] font-semibold">{f.key}</span>
+                            <span className="text-[#1F2937] truncate max-w-[160px]">{f.value}</span>
                           </div>
                         ))}
                       </div>
 
                       <div className="space-y-1.5">
                         {runAudits(extractFieldsFromText(regContent)).map((a, i) => (
-                          <div key={i} className="bg-[#070C18] border border-white/[0.06] rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[11px]">
-                            <span className="text-slate-300 font-medium">{a.name} ({a.id})</span>
+                          <div key={i} className="bg-[#FAF8F3] border border-[#E7E2D6] rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[11px]">
+                            <span className="text-[#374151] font-medium">{a.name} ({a.id})</span>
                             <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              a.status === "PASS" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                              a.status === "WARN" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                              "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              a.status === "PASS" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                              a.status === "WARN" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                              "bg-rose-50 text-rose-700 border border-rose-200"
                             }`}>
                               {a.status}
                             </span>
@@ -924,63 +942,65 @@ export default function App() {
                   )}
 
                   {/* 引导翻页小卡 */}
-                  <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl flex items-center justify-between text-xs text-slate-400">
-                    <span>已累计确权入账 {registrations.length} 件数据凭证</span>
+                  <div className="p-3 bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl flex items-center justify-between text-xs text-[#78716C]">
+                    <span>公文台账已累计收录 {registrations.length} 份数据凭证</span>
                     <button
                       onClick={() => setRegSubView("ledger")}
-                      className="text-cyan-400 hover:text-cyan-300 font-medium flex items-center gap-1"
+                      className="text-[#C23531] hover:text-[#991B1B] font-semibold flex items-center gap-1"
                     >
-                      查看台账簿 <ArrowRight className="w-3.5 h-3.5" />
+                      查阅存证台账簿 <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 视图 B: 已登记台账簿 (分页翻页器，不无限下滑) */}
+            {/* 视图 B: 已登记台账簿 (Ant Design 亮色规整表格，翻页控制) */}
             {regSubView === "ledger" && (
-              <div className="glass-panel rounded-2xl p-5 space-y-4">
+              <div className="paper-card rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="relative w-full sm:w-72">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <Search className="w-3.5 h-3.5 text-[#78716C] absolute left-3 top-2.5" />
                     <input
                       type="text"
-                      placeholder="搜索凭证号、文件名或主体..."
+                      placeholder="检索字号、文件名或经办单位..."
                       value={certSearch}
                       onChange={e => {
                         setCertSearch(e.target.value);
                         setRegPage(1);
                       }}
-                      className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl pl-9 pr-3 py-1.5 text-xs text-[#1F2937] focus:outline-none focus:border-[#C23531] focus:bg-white"
                     />
                   </div>
-                  <div className="text-xs text-slate-400">
-                    共 <strong className="text-white">{filteredRegistrations.length}</strong> 条记录 ｜ 每页 5 条
+                  <div className="text-xs text-[#78716C]">
+                    共 <strong className="text-[#1F2937] font-semibold">{filteredRegistrations.length}</strong> 份公文凭证 ｜ 每页 5 条
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-[#080D1A] text-slate-400 text-[11px] font-medium border-b border-white/[0.08]">
+                <div className="overflow-x-auto rounded-xl border border-[#E7E2D6]">
+                  <table className="w-full text-left text-xs text-[#374151]">
+                    <thead className="bg-[#FAF8F3] text-[#4B5563] text-[11px] font-semibold border-b border-[#E7E2D6]">
                       <tr>
-                        <th className="py-2.5 px-3.5 font-mono">凭证编号</th>
-                        <th className="py-2.5 px-3.5">文件名</th>
-                        <th className="py-2.5 px-3.5">登记主体</th>
-                        <th className="py-2.5 px-3.5">登记时间</th>
-                        <th className="py-2.5 px-3.5">状态</th>
+                        <th className="py-2.5 px-3.5 font-mono">公文字号</th>
+                        <th className="py-2.5 px-3.5">存证文件名</th>
+                        <th className="py-2.5 px-3.5">登记单位</th>
+                        <th className="py-2.5 px-3.5">确权时间</th>
+                        <th className="py-2.5 px-3.5">法律状态</th>
                         <th className="py-2.5 px-3.5 text-right">操作</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.04]">
+                    <tbody className="divide-y divide-[#F0EBE0]">
                       {paginatedRegistrations.map(r => (
-                        <tr key={r.cert_id} className="hover:bg-white/[0.02]">
-                          <td className="py-2.5 px-3.5 font-mono text-cyan-400 font-semibold">{r.cert_id}</td>
-                          <td className="py-2.5 px-3.5 text-white font-medium">{r.filename}</td>
-                          <td className="py-2.5 px-3.5 text-slate-400">{r.subject}</td>
-                          <td className="py-2.5 px-3.5 font-mono text-slate-500">{r.timestamp}</td>
+                        <tr key={r.cert_id} className="hover:bg-[#FAF8F3] transition-colors">
+                          <td className="py-2.5 px-3.5 font-mono text-[#C23531] font-bold">{r.cert_id}</td>
+                          <td className="py-2.5 px-3.5 text-[#1F2937] font-medium">{r.filename}</td>
+                          <td className="py-2.5 px-3.5 text-[#4B5563]">{r.subject}</td>
+                          <td className="py-2.5 px-3.5 font-mono text-[#78716C]">{r.timestamp}</td>
                           <td className="py-2.5 px-3.5">
                             <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              r.status === "有效" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-rose-400 bg-rose-500/10 border border-rose-500/20"
+                              r.status === "有效" 
+                                ? "text-emerald-700 bg-emerald-50 border border-emerald-200" 
+                                : "text-rose-700 bg-rose-50 border border-rose-200"
                             }`}>
                               {r.status}
                             </span>
@@ -991,9 +1011,9 @@ export default function App() {
                                 setSelectedCertId(r.cert_id);
                                 setActiveTab("验真");
                               }}
-                              className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
+                              className="text-xs text-[#C23531] hover:text-[#991B1B] font-semibold inline-flex items-center gap-1"
                             >
-                              验真 <ArrowRight className="w-3 h-3" />
+                              一键验真 <ArrowRight className="w-3 h-3" />
                             </button>
                           </td>
                         </tr>
@@ -1002,23 +1022,23 @@ export default function App() {
                   </table>
                 </div>
 
-                {/* 优雅翻页控件 */}
+                {/* 翻页控件 */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-[#78716C]">
                     第 {regPage} / {regTotalPages} 页
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       disabled={regPage <= 1}
                       onClick={() => setRegPage(p => Math.max(1, p - 1))}
-                      className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 disabled:hover:bg-white/[0.05] text-xs text-slate-300 flex items-center gap-1"
+                      className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] flex items-center gap-1 shadow-2xs"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" /> 上一页
                     </button>
                     <button
                       disabled={regPage >= regTotalPages}
                       onClick={() => setRegPage(p => Math.min(regTotalPages, p + 1))}
-                      className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 disabled:hover:bg-white/[0.05] text-xs text-slate-300 flex items-center gap-1"
+                      className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] flex items-center gap-1 shadow-2xs"
                     >
                       下一页 <ChevronRight className="w-3.5 h-3.5" />
                     </button>
@@ -1030,26 +1050,26 @@ export default function App() {
         )}
 
         {/* ====================================================================
-            页面 2: 一键验真 (视口自适应，结论先行，穿透证据翻页)
+            页面 2: 一键验真 (结论先行，盖朱砂印，穿透证据翻页)
            ==================================================================== */}
         {activeTab === "验真" && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E2D6] pb-3">
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h1 className="text-xl font-bold tracking-tight text-[#1F2937] flex items-center gap-2 font-serif">
                   <span>一键验真</span>
-                  <span className="text-xs font-normal text-slate-400 font-mono">（三层指纹 + 四级分诊判定）</span>
+                  <span className="text-xs font-normal text-[#78716C] font-sans">（三层指纹穿透 · 四级分诊裁定）</span>
                 </h1>
               </div>
 
               {/* 翻页切换按键：单件深挖 vs 批量工作台 */}
-              <div className="flex items-center bg-[#0A101D] p-1 rounded-xl border border-white/[0.08] text-xs">
+              <div className="flex items-center bg-[#F5F1E8] p-1 rounded-xl border border-[#E7E1D4] text-xs">
                 <button
                   onClick={() => setVerifySubView("single")}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                     verifySubView === "single" 
-                      ? "bg-indigo-600 text-white shadow-sm" 
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-[#C23531] text-white shadow-xs" 
+                      : "text-[#6B7280] hover:text-[#1F2937]"
                   }`}
                 >
                   单件深度验真
@@ -1061,12 +1081,12 @@ export default function App() {
                   }}
                   className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
                     verifySubView === "batch" 
-                      ? "bg-indigo-600 text-white shadow-sm" 
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-[#C23531] text-white shadow-xs" 
+                      : "text-[#6B7280] hover:text-[#1F2937]"
                   }`}
                 >
-                  <span>批量验真工作台</span>
-                  {batchResults && <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px]">已完成</span>}
+                  <span>批量快速工作台</span>
+                  {batchResults && <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full text-[10px]">已就绪</span>}
                 </button>
               </div>
             </div>
@@ -1075,29 +1095,29 @@ export default function App() {
             {verifySubView === "single" && (
               <div className="space-y-4">
                 {/* 紧凑单行配置带 */}
-                <div className="glass-panel rounded-2xl p-4 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                <div className="paper-card rounded-2xl p-4 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                   <div className="md:col-span-5">
-                    <label className="text-[11px] text-slate-400 block mb-1">选择核验凭证</label>
+                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">选择核验凭证字号</label>
                     <select
                       value={selectedCertId}
                       onChange={e => setSelectedCertId(e.target.value)}
-                      className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531]"
                     >
                       {registrations.map(r => (
                         <option key={r.cert_id} value={r.cert_id}>
                           {r.cert_id} · {r.filename}
                         </option>
                       ))}
-                      {registrations.length === 0 && <option value="">请先在登记页添加凭证</option>}
+                      {registrations.length === 0 && <option value="">请先在登记页签发凭证</option>}
                     </select>
                   </div>
 
                   <div className="md:col-span-5">
-                    <label className="text-[11px] text-slate-400 block mb-1">选择待验变异样例</label>
+                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">选择待验公文变异样例</label>
                     <select
                       value={verifySampleKey}
                       onChange={e => setVerifySampleKey(e.target.value)}
-                      className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500/60"
+                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs text-[#1F2937] focus:outline-none focus:border-[#C23531]"
                     >
                       {Object.entries(DEMO_SAMPLES).map(([k, v]) => (
                         <option key={k} value={k}>
@@ -1110,53 +1130,58 @@ export default function App() {
                   <div className="md:col-span-2">
                     <button
                       onClick={handleVerify}
-                      className="w-full py-1.5 px-4 bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 hover:opacity-95 text-white font-medium text-xs rounded-xl shadow-md shadow-indigo-500/20 flex items-center justify-center gap-1.5 transition-all"
+                      className="w-full py-1.5 px-4 bg-[#C23531] hover:bg-[#B91C1C] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
                     >
-                      <FileCheck className="w-3.5 h-3.5" /> 开始验真
+                      <FileCheck className="w-3.5 h-3.5" /> 立即核验盖印
                     </button>
                   </div>
                 </div>
 
-                {/* 结论卡 (固定顺序 ①: 结论先行) */}
+                {/* 结论公文呈批单 (结论先行 + 真实朱砂印章) */}
                 {verdict && (
                   <div className="space-y-4">
                     <div 
-                      className="glass-panel relative rounded-2xl p-5 flex items-center justify-between overflow-hidden"
-                      style={{ borderColor: `${verdict.color}60` }}
+                      className="official-doc-paper relative rounded-2xl p-6 flex items-center justify-between overflow-hidden"
+                      style={{ borderLeft: `5px solid ${verdict.color}` }}
                     >
-                      <div className="space-y-1">
-                        <div className="text-2xl font-extrabold tracking-tight" style={{ color: verdict.color }}>
+                      <div className="space-y-1.5 pr-28">
+                        <div className="text-[11px] font-serif font-bold text-[#78716C] tracking-wide">
+                          数玺数据真实性查验裁定书 · 结论呈批
+                        </div>
+                        <div className="text-2xl font-black tracking-tight" style={{ color: verdict.color }}>
                           {verdict.label}
                         </div>
-                        <div className="text-xs font-mono text-slate-400">
-                          把握 <span className="text-white font-semibold">{verdict.confidence}%</span> ｜ 本次验真耗时 <span className="text-white font-semibold">{verdict.elapsed_ms} ms</span>
+                        <div className="text-xs font-mono text-[#6B7280] pt-1">
+                          判定置信度：<strong className="text-[#1F2937] font-semibold">{verdict.confidence}%</strong> ｜ 
+                          计算耗时：<strong className="text-[#1F2937] font-semibold">{verdict.elapsed_ms} ms</strong> ｜ 
+                          回执单号：<span className="font-mono text-[#C23531] font-bold">{verdict.receipt_id}</span>
                         </div>
                       </div>
 
-                      {/* 结论玺印 (落印动画) */}
-                      <div className="seal-stamp-verdict flex flex-col items-center justify-center text-white text-3xl font-bold shrink-0">
+                      {/* 物理落印朱砂印章 (鎏金外圈 + 宣纸吸墨落印) */}
+                      <div className="absolute right-6 seal-stamp-verdict flex flex-col items-center justify-center text-white text-3xl font-bold shrink-0 shadow-lg">
                         <div>{verdict.seal_text[0]}</div>
                         <div>{verdict.seal_text[1] || '级'}</div>
                       </div>
                     </div>
 
-                    {/* 翻页切换证据卡（避免长滚动）：依据 / 差异表 / 双根比对 / 勾稽 */}
-                    <div className="glass-panel rounded-2xl p-4 space-y-3">
-                      <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
-                        <div className="flex items-center gap-2">
+                    {/* 穿透证据公文纸 (依据 / 差异表 / 双根比对 / 勾稽) */}
+                    <div className="paper-card rounded-2xl p-5 space-y-3">
+                      <div className="flex items-center justify-between border-b border-[#E7E2D6] pb-2">
+                        <div className="flex items-center gap-1">
                           {[
-                            { id: "reasons", label: "判定依据清单" },
-                            { id: "diff", label: `字段差异表 (${verdict.diff_table.length})` },
+                            { id: "reasons", label: "裁定依据清单" },
+                            { id: "diff", label: `字段篡改对比表 (${verdict.diff_table.length})` },
                             { id: "roots", label: "精确双根比对" },
-                            { id: "audits", label: "勾稽复算" },
+                            { id: "audits", label: "数据勾稽复算" },
                           ].map(t => (
                             <button
                               key={t.id}
                               onClick={() => setVerdictEvidenceTab(t.id as any)}
-                              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
                                 verdictEvidenceTab === t.id 
-                                  ? "bg-white/10 text-cyan-300 font-semibold" 
-                                  : "text-slate-400 hover:text-white"
+                                  ? "bg-[#FAF8F3] text-[#C23531] border border-[#DCD5C6]" 
+                                  : "text-[#6B7280] hover:text-[#1F2937]"
                               }`}
                             >
                               {t.label}
@@ -1164,59 +1189,61 @@ export default function App() {
                           ))}
                         </div>
 
-                        {/* 回执号小标签 */}
-                        <span className="text-[11px] font-mono text-slate-400">
-                          回执: <strong className="text-cyan-400">{verdict.receipt_id}</strong>
+                        <span className="text-[11px] font-mono text-[#78716C]">
+                          存证区块链高度: #{ledger.length}
                         </span>
                       </div>
 
                       {/* 证据子翻页内容 */}
                       <div className="min-h-[120px] pt-1">
                         {verdictEvidenceTab === "reasons" && (
-                          <ul className="space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                          <ul className="space-y-2 text-xs text-[#374151]">
                             {verdict.reasons.map((r, i) => (
-                              <li key={i}>{r}</li>
+                              <li key={i} className="flex items-start gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#C23531] mt-1.5 shrink-0"></span>
+                                <span>{r}</span>
+                              </li>
                             ))}
                           </ul>
                         )}
 
                         {verdictEvidenceTab === "diff" && (
                           verdict.diff_table.length > 0 ? (
-                            <div className="overflow-x-auto rounded-xl border border-rose-500/30">
+                            <div className="overflow-x-auto rounded-xl border border-rose-200 bg-rose-50/30">
                               <table className="w-full text-left text-xs">
-                                <thead className="bg-rose-950/40 text-rose-300 text-[11px]">
+                                <thead className="bg-rose-100 text-rose-900 text-[11px] font-semibold border-b border-rose-200">
                                   <tr>
-                                    <th className="p-2.5">字段名</th>
-                                    <th className="p-2.5">登记原值 (存证)</th>
-                                    <th className="p-2.5">待验当前值 (篡改)</th>
+                                    <th className="p-2.5">被篡改字段项</th>
+                                    <th className="p-2.5">公文登记原值 (存证真值)</th>
+                                    <th className="p-2.5">待验伪造值 (被篡改)</th>
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y divide-rose-500/20 font-mono text-xs">
+                                <tbody className="divide-y divide-rose-200 font-mono text-xs">
                                   {verdict.diff_table.map((d, i) => (
-                                    <tr key={i} className="bg-rose-950/20 text-rose-300">
-                                      <td className="p-2.5 font-bold">{d.field}</td>
-                                      <td className="p-2.5 line-through opacity-70">{d.registered_val}</td>
-                                      <td className="p-2.5 font-bold text-rose-200">{d.current_val}</td>
+                                    <tr key={i} className="hover:bg-rose-100/40">
+                                      <td className="p-2.5 font-bold text-rose-950 font-sans">{d.field}</td>
+                                      <td className="p-2.5 line-through text-slate-500">{d.registered_val}</td>
+                                      <td className="p-2.5 font-bold text-rose-700 bg-rose-100/60">{d.current_val}</td>
                                     </tr>
                                   ))}
                                 </tbody>
                               </table>
                             </div>
                           ) : (
-                            <div className="text-center py-6 text-emerald-400 text-xs flex items-center justify-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4" /> 经逐项复算比对，所有语义字段值未发生任何修改！
+                            <div className="text-center py-8 text-emerald-700 text-xs flex items-center justify-center gap-1.5 font-medium">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> 经逐项复算比对，所有语义字段值未发生任何修改！
                             </div>
                           )
                         )}
 
                         {verdictEvidenceTab === "roots" && (
                           <div className="space-y-2 text-xs font-mono">
-                            <pre className="bg-[#070C18] border border-white/[0.06] rounded-xl p-3 text-[11px] text-slate-300 overflow-x-auto">
+                            <pre className="bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl p-3 text-[11px] text-[#374151] overflow-x-auto leading-relaxed">
                               {JSON.stringify(verdict.exact_details, null, 2)}
                             </pre>
-                            <div className="grid grid-cols-2 gap-2 text-slate-400 text-[11px]">
-                              <div>文本 3-gram 相似度: <strong className="text-white">{verdict.perceptual_details?.text_sim_str}</strong></div>
-                              <div>汉明距离: <strong className="text-white">{verdict.perceptual_details?.avg_hamming}</strong></div>
+                            <div className="grid grid-cols-2 gap-2 text-[#78716C] text-[11px]">
+                              <div>文本 3-gram 相似度: <strong className="text-[#1F2937]">{verdict.perceptual_details?.text_sim_str}</strong></div>
+                              <div>汉明距离: <strong className="text-[#1F2937]">{verdict.perceptual_details?.avg_hamming}</strong></div>
                             </div>
                           </div>
                         )}
@@ -1224,10 +1251,10 @@ export default function App() {
                         {verdictEvidenceTab === "audits" && (
                           <div className="space-y-1.5 text-xs">
                             {verdict.audits?.map((a, i) => (
-                              <div key={i} className="bg-[#070C18] border border-white/[0.06] rounded-lg p-2.5 flex items-center justify-between text-xs">
-                                <span className="text-slate-300"><strong>{a.name} ({a.id})</strong>: {a.message}</span>
+                              <div key={i} className="bg-[#FAF8F3] border border-[#E7E2D6] rounded-lg p-2.5 flex items-center justify-between text-xs">
+                                <span className="text-[#374151]"><strong>{a.name} ({a.id})</strong>: {a.message}</span>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                  a.status === "PASS" ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
+                                  a.status === "PASS" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" : "text-rose-700 bg-rose-50 border border-rose-200"
                                 }`}>{a.status}</span>
                               </div>
                             ))}
@@ -1235,22 +1262,22 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* 报告复核按钮 */}
-                      <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between">
-                        <div className="text-[11px] font-mono text-slate-400 truncate max-w-sm">
-                          报告哈希: {verdict.report_hash}
+                      {/* 报告复核与哈希 */}
+                      <div className="pt-2 border-t border-[#E7E2D6] flex items-center justify-between">
+                        <div className="text-[11px] font-mono text-[#78716C] truncate max-w-sm">
+                          裁定报告哈希: {verdict.report_hash}
                         </div>
                         <button
                           onClick={() => setReportReviewed(true)}
-                          className="px-3 py-1 bg-white/[0.06] hover:bg-white/[0.1] rounded-lg text-xs font-medium text-slate-200 flex items-center gap-1.5"
+                          className="px-3 py-1 bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] rounded-lg text-xs font-medium text-[#374151] flex items-center gap-1.5 shadow-2xs"
                         >
-                          <RefreshCw className="w-3 h-3 text-cyan-400" /> 复核报告真伪
+                          <RefreshCw className="w-3.5 h-3.5 text-[#C23531]" /> 复核报告与回执匹配
                         </button>
                       </div>
 
                       {reportReviewed && (
-                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center gap-2">
-                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                           报告复核通过：重算报告哈希与账本回执记录完全匹配，真实且未被篡改！
                         </div>
                       )}
@@ -1260,70 +1287,70 @@ export default function App() {
               </div>
             )}
 
-            {/* 视图 B: 批量验真工作台 (分页控制，不长滚动) */}
+            {/* 视图 B: 批量验真工作台 (Ant Design 亮色规整表格) */}
             {verifySubView === "batch" && (
-              <div className="glass-panel rounded-2xl p-5 space-y-4">
+              <div className="paper-card rounded-2xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">批量验真结果流</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">对多个变异样例进行自动化分级验真与统计</p>
+                    <h3 className="text-sm font-bold text-[#1F2937] font-serif">批量验真公文流水线</h3>
+                    <p className="text-xs text-[#78716C] mt-0.5">面向多套变异样本的自动化分级裁定与统计</p>
                   </div>
                   <button
                     onClick={handleRunBatchVerify}
-                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all self-start sm:self-auto"
+                    className="px-3.5 py-1.5 bg-[#C23531] hover:bg-[#B91C1C] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" /> 重新执行批量验真
+                    <RefreshCw className="w-3.5 h-3.5" /> 重新执行批量核验
                   </button>
                 </div>
 
                 {batchResults && (
                   <div className="space-y-4">
-                    {/* 统计胶囊 */}
+                    {/* 四级统计标签 */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-semibold">
+                      <span className="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold">
                         甲级 (原件未动): {batchResults.stats["甲级"]}
                       </span>
-                      <span className="px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-300 font-semibold">
+                      <span className="px-3 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 font-semibold">
                         乙级 (载体等价): {batchResults.stats["乙级"]}
                       </span>
-                      <span className="px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-semibold">
+                      <span className="px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
                         丙级 (自相矛盾): {batchResults.stats["丙级"]}
                       </span>
-                      <span className="px-3 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 font-semibold">
+                      <span className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
                         丁级 (关键字段改): {batchResults.stats["丁级"]}
                       </span>
-                      <span className="text-xs font-mono text-slate-500 ml-auto">总耗时: {batchResults.totalMs} ms</span>
+                      <span className="text-xs font-mono text-[#78716C] ml-auto">总耗时: {batchResults.totalMs} ms</span>
                     </div>
 
                     {/* 分页表格 */}
-                    <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+                    <div className="overflow-x-auto rounded-xl border border-[#E7E2D6]">
                       <table className="w-full text-left text-xs">
-                        <thead className="bg-[#080D1A] text-slate-400 text-[11px] font-medium border-b border-white/[0.08]">
+                        <thead className="bg-[#FAF8F3] text-[#4B5563] text-[11px] font-semibold border-b border-[#E7E2D6]">
                           <tr>
                             <th className="py-2.5 px-3.5">待验样例</th>
-                            <th className="py-2.5 px-3.5 font-mono">锚定凭证</th>
+                            <th className="py-2.5 px-3.5 font-mono">锚定凭证字号</th>
                             <th className="py-2.5 px-3.5">验真分级</th>
                             <th className="py-2.5 px-3.5">置信把握</th>
                             <th className="py-2.5 px-3.5 text-right font-mono">耗时</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.04]">
+                        <tbody className="divide-y divide-[#F0EBE0]">
                           {batchResults.items.slice((batchPage - 1) * ITEMS_PER_PAGE, batchPage * ITEMS_PER_PAGE).map((item, idx) => (
-                            <tr key={idx} className="hover:bg-white/[0.02]">
-                              <td className="py-2.5 px-3.5 text-white font-medium">{item.name}</td>
-                              <td className="py-2.5 px-3.5 font-mono text-cyan-400">{item.cert}</td>
+                            <tr key={idx} className="hover:bg-[#FAF8F3] transition-colors">
+                              <td className="py-2.5 px-3.5 text-[#1F2937] font-medium">{item.name}</td>
+                              <td className="py-2.5 px-3.5 font-mono text-[#C23531] font-semibold">{item.cert}</td>
                               <td className="py-2.5 px-3.5">
                                 <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
-                                  item.grade === "甲级" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" :
-                                  item.grade === "乙级" ? "text-sky-400 bg-sky-500/10 border border-sky-500/20" :
-                                  item.grade === "丙级" ? "text-amber-400 bg-amber-500/10 border border-amber-500/20" :
-                                  "text-rose-400 bg-rose-500/10 border border-rose-500/20"
+                                  item.grade === "甲级" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" :
+                                  item.grade === "乙级" ? "text-sky-700 bg-sky-50 border border-sky-200" :
+                                  item.grade === "丙级" ? "text-amber-700 bg-amber-50 border border-amber-200" :
+                                  "text-rose-700 bg-rose-50 border border-rose-200"
                                 }`}>
                                   {item.grade}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3.5 font-mono">{item.confidence}%</td>
-                              <td className="py-2.5 px-3.5 text-right font-mono text-slate-500">{item.ms} ms</td>
+                              <td className="py-2.5 px-3.5 font-mono text-[#374151]">{item.confidence}%</td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-[#78716C]">{item.ms} ms</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1332,21 +1359,21 @@ export default function App() {
 
                     {/* 分页控制 */}
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-[#78716C]">
                         第 {batchPage} / {Math.max(1, Math.ceil(batchResults.items.length / ITEMS_PER_PAGE))} 页
                       </span>
                       <div className="flex items-center gap-2">
                         <button
                           disabled={batchPage <= 1}
                           onClick={() => setBatchPage(p => Math.max(1, p - 1))}
-                          className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                          className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                         >
                           上一页
                         </button>
                         <button
                           disabled={batchPage >= Math.ceil(batchResults.items.length / ITEMS_PER_PAGE)}
                           onClick={() => setBatchPage(p => p + 1)}
-                          className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                          className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                         >
                           下一页
                         </button>
@@ -1360,20 +1387,20 @@ export default function App() {
         )}
 
         {/* ====================================================================
-            页面 3: 授权与账本 (翻页选项卡，紧凑视口，避免 3000px 巨幅长滚)
+            页面 3: 授权与账本 (联排流水账簿，宣纸公文连珠)
            ==================================================================== */}
         {activeTab === "授权与账本" && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E7E2D6] pb-3">
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                <h1 className="text-xl font-bold tracking-tight text-[#1F2937] flex items-center gap-2 font-serif">
                   <span>授权与账本</span>
-                  <span className="text-xs font-normal text-slate-400 font-mono">（记名授权 · 链上回执 · 检查点封印）</span>
+                  <span className="text-xs font-normal text-[#78716C] font-sans">（记名授权 · 链上回执 · 检查点封印）</span>
                 </h1>
               </div>
 
               {/* 模块子翻页标签 */}
-              <div className="flex items-center bg-[#0A101D] p-1 rounded-xl border border-white/[0.08] text-xs">
+              <div className="flex items-center bg-[#F5F1E8] p-1 rounded-xl border border-[#E7E1D4] text-xs">
                 {[
                   { id: "chain", label: "哈希链与检查点" },
                   { id: "auth", label: `记名授权 (${authBlocks.length})` },
@@ -1385,8 +1412,8 @@ export default function App() {
                     onClick={() => setLedgerSubView(t.id as any)}
                     className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                       ledgerSubView === t.id 
-                        ? "bg-indigo-600 text-white shadow-sm" 
-                        : "text-slate-400 hover:text-white"
+                        ? "bg-[#C23531] text-white shadow-xs" 
+                        : "text-[#6B7280] hover:text-[#1F2937]"
                     }`}
                   >
                     {t.label}
@@ -1395,23 +1422,23 @@ export default function App() {
               </div>
             </div>
 
-            {/* 子视图 1: 哈希链区块流向与检查点封印 */}
+            {/* 子视图 1: 联排流水账簿与区块流向 */}
             {ledgerSubView === "chain" && (
               <div className="space-y-4">
-                <div className="glass-panel rounded-2xl p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                      <Database className="w-4 h-4 text-indigo-400" /> 哈希链区块流向 (共 {ledger.length} 个区块)
+                <div className="paper-card rounded-2xl p-5 space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-[#F0EBE0] pb-3">
+                    <span className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 font-serif">
+                      <Database className="w-4 h-4 text-[#C23531]" /> 联排哈希流水区块卷宗 (共 {ledger.length} 块)
                     </span>
                     <button
                       onClick={handleWriteCheckpoint}
-                      className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:opacity-95 text-white text-xs font-medium rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-500/20"
+                      className="px-3.5 py-1.5 bg-[#C23531] hover:bg-[#B91C1C] text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-xs"
                     >
                       <Lock className="w-3.5 h-3.5" /> 写入检查点（封印当前链头）
                     </button>
                   </div>
 
-                  {/* 区块小方块流向 (点击展开区块明细) */}
+                  {/* 联排小印信块区块流向 */}
                   <div className="flex items-center gap-2 overflow-x-auto py-2.5">
                     {ledger.slice(-28).map((blk, idx, arr) => {
                       const isHead = idx === arr.length - 1;
@@ -1419,53 +1446,55 @@ export default function App() {
                         <button
                           key={blk.height}
                           onClick={() => setInspectBlock(blk)}
-                          className={`w-4 h-4 rounded transition-all shrink-0 ${
+                          className={`w-6 h-6 rounded-md text-[10px] font-mono font-bold transition-all shrink-0 flex items-center justify-center ${
                             isHead 
-                              ? "bg-cyan-400 shadow-[0_0_12px_#22D3EE] ring-2 ring-white" 
-                              : "bg-indigo-600 hover:bg-indigo-500"
+                              ? "bg-[#C23531] text-white ring-2 ring-[#D97706] shadow-sm" 
+                              : "bg-[#EFEAE0] hover:bg-[#DCD5C6] text-[#374151] border border-[#DCD5C6]"
                           }`}
                           title={`高度 ${blk.height} · 类型: ${blk.entry_type} (点击查看)`}
-                        />
+                        >
+                          {blk.height}
+                        </button>
                       );
                     })}
-                    <span className="text-[11px] text-slate-400 font-mono ml-2 shrink-0">最右为当前链头</span>
+                    <span className="text-[11px] text-[#78716C] font-mono ml-2 shrink-0">红色为最新链头</span>
                   </div>
                 </div>
 
-                {/* 展开的区块明细 */}
+                {/* 展开的区块公文明细 */}
                 {inspectBlock ? (
-                  <div className="bg-[#070C18] border border-cyan-500/30 rounded-2xl p-4 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-cyan-300 font-semibold">
-                      <span>区块高度 #{inspectBlock.height} · 类型: {inspectBlock.entry_type}</span>
-                      <button onClick={() => setInspectBlock(null)} className="text-slate-400 hover:text-white">✕ 关闭详情</button>
+                  <div className="bg-[#FAF8F3] border border-[#C23531]/40 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-[#C23531] font-bold">
+                      <span>区块高度 #{inspectBlock.height} · 卷宗类型: {inspectBlock.entry_type}</span>
+                      <button onClick={() => setInspectBlock(null)} className="text-[#78716C] hover:text-[#1F2937]">✕ 关闭明细</button>
                     </div>
-                    <pre className="bg-black/50 p-3 rounded-xl text-[11px] font-mono text-slate-300 overflow-x-auto max-h-[220px]">
+                    <pre className="bg-white border border-[#E7E2D6] p-3 rounded-xl text-[11px] font-mono text-[#374151] overflow-x-auto max-h-[220px]">
                       {JSON.stringify(inspectBlock, null, 2)}
                     </pre>
                   </div>
                 ) : (
-                  <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl text-center text-xs text-slate-400">
-                    提示：点击上方小方块可实时下钻查看该区块的签名、载荷与 Merkle 前驱哈希。
+                  <div className="p-4 bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl text-center text-xs text-[#78716C]">
+                    提示：点击上方联排区块可下钻查验该区块的 Ed25519 签名、存证载荷与 Merkle 前驱双哈希。
                   </div>
                 )}
               </div>
             )}
 
-            {/* 子视图 2: 记名授权中心 (新建 + 分页列表) */}
+            {/* 子视图 2: 记名授权中心 */}
             {ledgerSubView === "auth" && (
               <div className="space-y-4">
                 {/* 新建授权表单 */}
-                <div className="glass-panel rounded-2xl p-5 space-y-3.5">
-                  <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-cyan-400" /> 新建记名查验授权
+                <div className="paper-card rounded-2xl p-5 space-y-3.5">
+                  <div className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 border-b border-[#F0EBE0] pb-2">
+                    <Key className="w-3.5 h-3.5 text-[#C23531]" /> 新建记名查验授权文书
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">选登记凭证</label>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">选定存证公文字号</label>
                       <select
                         value={authCertId}
                         onChange={e => setAuthCertId(e.target.value)}
-                        className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl p-2 text-xs font-mono text-white"
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-2 text-xs font-mono text-[#1F2937]"
                       >
                         {registrations.map(r => (
                           <option key={r.cert_id} value={r.cert_id}>{r.cert_id} · {r.filename}</option>
@@ -1474,72 +1503,72 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">被授权方主体名称</label>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">被授权方主体全称</label>
                       <input
                         type="text"
                         value={grantee}
                         onChange={e => setGrantee(e.target.value)}
-                        className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl p-2 text-xs text-white"
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-2 text-xs text-[#1F2937]"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">有效天数</label>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">授权有效天数</label>
                       <input
                         type="number"
                         value={validDays}
                         onChange={e => setValidDays(parseInt(e.target.value) || 30)}
-                        className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl p-2 text-xs font-mono text-white"
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-2 text-xs font-mono text-[#1F2937]"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] text-slate-400 block mb-1">最大查验次数</label>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">最大核验次数上限</label>
                       <input
                         type="number"
                         value={maxUses}
                         onChange={e => setMaxUses(parseInt(e.target.value) || 10)}
-                        className="w-full bg-[#070C18] border border-white/[0.08] rounded-xl p-2 text-xs font-mono text-white"
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-2 text-xs font-mono text-[#1F2937]"
                       />
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-end pt-2">
                     <button
                       onClick={handleCreateAuth}
-                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-medium"
+                      className="px-5 py-2 bg-[#C23531] hover:bg-[#B91C1C] text-white rounded-xl text-xs font-semibold shadow-xs"
                     >
-                      创建记名授权并上链
+                      签署记名授权并上账
                     </button>
                   </div>
                 </div>
 
                 {/* 分页授权列表 */}
-                <div className="glass-panel rounded-2xl p-5 space-y-3">
-                  <div className="text-xs font-semibold text-white">生效中授权清单</div>
-                  <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+                <div className="paper-card rounded-2xl p-5 space-y-3">
+                  <div className="text-xs font-bold text-[#1F2937]">生效中记名授权公文单</div>
+                  <div className="overflow-x-auto rounded-xl border border-[#E7E2D6]">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-[#080D1A] text-slate-400 text-[11px] border-b border-white/[0.08]">
+                      <thead className="bg-[#FAF8F3] text-[#4B5563] text-[11px] font-semibold border-b border-[#E7E2D6]">
                         <tr>
                           <th className="p-2.5">授权编号</th>
-                          <th className="p-2.5">对应凭证</th>
-                          <th className="p-2.5">被授权主体</th>
-                          <th className="p-2.5">有效期</th>
-                          <th className="p-2.5 text-right">查验次数上限</th>
+                          <th className="p-2.5">关联存证字号</th>
+                          <th className="p-2.5">被授权单位</th>
+                          <th className="p-2.5">有效天数</th>
+                          <th className="p-2.5 text-right">核验额度</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
+                      <tbody className="divide-y divide-[#F0EBE0] font-mono text-xs text-[#374151]">
                         {paginatedAuths.map(b => (
-                          <tr key={b.height} className="hover:bg-white/[0.02]">
-                            <td className="p-2.5 text-cyan-400 font-bold">{b.payload.auth_id}</td>
-                            <td className="p-2.5 text-slate-300">{b.payload.cert_id}</td>
-                            <td className="p-2.5 font-sans text-slate-200">{b.payload.grantee}</td>
+                          <tr key={b.height} className="hover:bg-[#FAF8F3]">
+                            <td className="p-2.5 text-[#C23531] font-bold">{b.payload.auth_id}</td>
+                            <td className="p-2.5">{b.payload.cert_id}</td>
+                            <td className="p-2.5 font-sans font-medium text-[#1F2937]">{b.payload.grantee}</td>
                             <td className="p-2.5">{b.payload.valid_days} 天</td>
-                            <td className="p-2.5 text-right text-slate-400">{b.payload.max_uses} 次</td>
+                            <td className="p-2.5 text-right text-[#78716C]">{b.payload.max_uses} 次</td>
                           </tr>
                         ))}
                         {authBlocks.length === 0 && (
-                          <tr><td colSpan={5} className="p-4 text-center text-slate-500 italic">暂无授权记录</td></tr>
+                          <tr><td colSpan={5} className="p-4 text-center text-[#78716C] italic font-sans">暂无记名授权记录</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -1547,19 +1576,19 @@ export default function App() {
 
                   {/* 翻页器 */}
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-xs text-slate-500">第 {authPage} / {authTotalPages} 页</span>
+                    <span className="text-xs text-[#78716C]">第 {authPage} / {authTotalPages} 页</span>
                     <div className="flex items-center gap-2">
                       <button
                         disabled={authPage <= 1}
                         onClick={() => setAuthPage(p => Math.max(1, p - 1))}
-                        className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                        className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                       >
                         上一页
                       </button>
                       <button
                         disabled={authPage >= authTotalPages}
                         onClick={() => setAuthPage(p => Math.min(authTotalPages, p + 1))}
-                        className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                        className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                       >
                         下一页
                       </button>
@@ -1569,40 +1598,40 @@ export default function App() {
               </div>
             )}
 
-            {/* 子视图 3: 查验回执流水 (分页控制) */}
+            {/* 子视图 3: 查验回执流水 */}
             {ledgerSubView === "receipts" && (
-              <div className="glass-panel rounded-2xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                    <FileCheck className="w-4 h-4 text-emerald-400" /> 查验签名回执总表 (共 {receiptBlocks.length} 条)
+              <div className="paper-card rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between border-b border-[#F0EBE0] pb-2">
+                  <div className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 font-serif">
+                    <FileCheck className="w-4 h-4 text-[#059669]" /> 链上签名查验回执总台账 (共 {receiptBlocks.length} 条)
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+                <div className="overflow-x-auto rounded-xl border border-[#E7E2D6]">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#080D1A] text-slate-400 text-[11px] border-b border-white/[0.08]">
+                    <thead className="bg-[#FAF8F3] text-[#4B5563] text-[11px] font-semibold border-b border-[#E7E2D6]">
                       <tr>
-                        <th className="p-2.5">回执号</th>
-                        <th className="p-2.5">凭证编号</th>
-                        <th className="p-2.5">结论分级</th>
+                        <th className="p-2.5">回执单号</th>
+                        <th className="p-2.5">存证凭证字号</th>
+                        <th className="p-2.5">裁定结论</th>
                         <th className="p-2.5">核验主体</th>
-                        <th className="p-2.5 font-mono">时间</th>
+                        <th className="p-2.5 font-mono">核验时间</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.04] font-mono text-xs">
+                    <tbody className="divide-y divide-[#F0EBE0] font-mono text-xs text-[#374151]">
                       {paginatedReceipts.map(b => (
-                        <tr key={b.height} className="hover:bg-white/[0.02]">
-                          <td className="p-2.5 text-indigo-400 font-bold">{b.payload.receipt_id}</td>
-                          <td className="p-2.5 text-slate-300">{b.payload.cert_id}</td>
+                        <tr key={b.height} className="hover:bg-[#FAF8F3]">
+                          <td className="p-2.5 text-[#C23531] font-bold">{b.payload.receipt_id}</td>
+                          <td className="p-2.5">{b.payload.cert_id}</td>
                           <td className="p-2.5 font-sans">
-                            <span className="text-white font-medium">{b.payload.verdict_grade}</span>
+                            <span className="font-semibold text-[#1F2937]">{b.payload.verdict_grade}</span>
                           </td>
-                          <td className="p-2.5 font-sans text-slate-300">{b.payload.verifier_subject}</td>
-                          <td className="p-2.5 text-slate-500">{b.payload.timestamp}</td>
+                          <td className="p-2.5 font-sans text-[#4B5563]">{b.payload.verifier_subject}</td>
+                          <td className="p-2.5 text-[#78716C]">{b.payload.timestamp}</td>
                         </tr>
                       ))}
                       {receiptBlocks.length === 0 && (
-                        <tr><td colSpan={5} className="p-4 text-center text-slate-500 italic">暂无查验回执入账</td></tr>
+                        <tr><td colSpan={5} className="p-4 text-center text-[#78716C] italic font-sans">暂无查验回执入账</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1610,19 +1639,19 @@ export default function App() {
 
                 {/* 翻页器 */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-slate-500">第 {receiptPage} / {receiptTotalPages} 页</span>
+                  <span className="text-xs text-[#78716C]">第 {receiptPage} / {receiptTotalPages} 页</span>
                   <div className="flex items-center gap-2">
                     <button
                       disabled={receiptPage <= 1}
                       onClick={() => setReceiptPage(p => Math.max(1, p - 1))}
-                      className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                      className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                     >
                       上一页
                     </button>
                     <button
                       disabled={receiptPage >= receiptTotalPages}
                       onClick={() => setReceiptPage(p => Math.min(receiptTotalPages, p + 1))}
-                      className="px-3 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] disabled:opacity-30 text-xs text-slate-300"
+                      className="px-3 py-1 rounded-lg bg-white hover:bg-[#FAF8F3] border border-[#DCD5C6] disabled:opacity-40 text-xs text-[#374151] shadow-2xs"
                     >
                       下一页
                     </button>
@@ -1633,35 +1662,35 @@ export default function App() {
 
             {/* 子视图 4: 作废与撤销管理 */}
             {ledgerSubView === "revoke" && (
-              <div className="glass-panel rounded-2xl p-5 space-y-3">
-                <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                  <AlertOctagon className="w-4 h-4 text-rose-400" /> 凭证作废管理中心 (操作不可逆)
+              <div className="paper-card rounded-2xl p-5 space-y-3">
+                <div className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 border-b border-[#F0EBE0] pb-2 font-serif">
+                  <AlertOctagon className="w-4 h-4 text-[#C23531]" /> 存证公文作废与止付注销（链上不可逆）
                 </div>
-                <p className="text-xs text-slate-400">
-                  登记方私钥正式签名作废后，后续该凭证的一切验真均直接前置终止并判定为「已作废」。
+                <p className="text-xs text-[#78716C]">
+                  经办方私钥正式签名作废后，该存证公文在全网所有验真节点将直接前置熔断并裁定为「已作废」。
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
                   {registrations.filter(r => r.status === "有效").map(r => (
-                    <div key={r.cert_id} className="p-3 bg-[#070C18] border border-white/[0.06] rounded-xl flex items-center justify-between">
+                    <div key={r.cert_id} className="p-3 bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl flex items-center justify-between">
                       <div className="overflow-hidden mr-2">
-                        <div className="font-mono text-xs text-white truncate">{r.cert_id}</div>
-                        <div className="text-[11px] text-slate-500 truncate">{r.filename}</div>
+                        <div className="font-mono text-xs font-bold text-[#1F2937] truncate">{r.cert_id}</div>
+                        <div className="text-[11px] text-[#78716C] truncate">{r.filename}</div>
                       </div>
                       <button
                         onClick={() => {
-                          if (window.confirm(`确定要永久作废凭证 ${r.cert_id} 吗？上账后不可逆！`)) {
+                          if (window.confirm(`确定要永久作废存证公文 ${r.cert_id} 吗？上账后不可逆！`)) {
                             handleRevokeCert(r.cert_id);
                           }
                         }}
-                        className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] rounded-lg shrink-0 transition-colors"
+                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-[11px] font-semibold rounded-lg shrink-0 transition-colors shadow-2xs"
                       >
-                        作废
+                        作废注销
                       </button>
                     </div>
                   ))}
                   {registrations.filter(r => r.status === "有效").length === 0 && (
-                    <div className="col-span-3 text-center py-6 text-slate-500 text-xs italic">
+                    <div className="col-span-3 text-center py-6 text-[#78716C] text-xs italic">
                       无有效状态凭证可供作废
                     </div>
                   )}
@@ -1670,7 +1699,7 @@ export default function App() {
             )}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

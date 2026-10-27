@@ -1,509 +1,283 @@
+# -*- coding: utf-8 -*-
 """
-数玺 · 勾稽审计与四级判定引擎 (engine/grade.py)
-规范版本: 1.3
-套件标识: SXA1
-包含:
-1. G1 合计复算 (同列/同行条目之和，容差 max(0.01, 1e-6))
-2. G2 大小写一致 (小写金额 vs 中文大写换算值)
-3. G3 经营勾稽 (营业收入 - 营业成本 - 净利润 != 0 仅提示，不参与丙级)
-4. 四级判定 (严格分诊顺序: 甲级/丁级/丙级/乙级/待人工复核)
-"""
+数玺核心引擎 · 勾稽与四级判定 (实现《数玺协议规范 v1.2》第 6、7 节)
 
-import time
-import math
+判定顺序 (先命中先定级): 状态前置 -> 甲 -> 丁 -> 丙(相对基准) -> 乙 -> 待人工复核。
+把握为基线值, 多个封顶同时命中取最低者 (规范 §6)。
+勾稽编号: G1 合计复算 / G2 金额大小写 / G3 字段间提示 (不入丙级比对)。
+"""
+from __future__ import annotations
+
 import re
-from typing import List, Dict, Any, Tuple, Optional
-from engine.fp import parse_cn_amount, normalize_amount_string
+from decimal import Decimal
+
+from engine import fp
+
+TOL_ABS = 0.01
+TOL_REL = 1e-6
+
+# ---------------------------------------------------------------- G2 大写金额
+
+_CN_DIGITS = {"零": 0, "壹": 1, "贰": 2, "叁": 3, "肆": 4, "伍": 5,
+              "陆": 6, "柒": 7, "捌": 8, "玖": 9}
+_CN_UNITS = {"拾": 10, "佰": 100, "仟": 1000, "万": 10000, "亿": 100000000}
 
 
-# ==========================================================
-# 5.5 勾稽审计 (G1, G2, G3)
-# ==========================================================
-def run_g1_audit(fields: List[Tuple[str, str]]) -> Dict[str, Any]:
-    """
-    G1 合计复算:
-    合计 = 同列/同行分项条目之和
-    容差取绝对 0.01 与相对 1e-6 两者之大: max(0.01, 1e-6 * abs(total))
-    """
-    total_val = None
-    sub_vals = []
-    has_total = False
-
-    for k, v in fields:
-        clean_k = re.sub(r'#\d+$', '', k).strip()
-        # 清洗数值
-        val_str = normalize_amount_string(v)
-        try:
-            num = float(val_str)
-        except ValueError:
-            continue
-
-        if clean_k in ['合计', '总计', '总额', '合计数']:
-            total_val = num
-            has_total = True
-        elif any(sub in clean_k for sub in ['销售收入', '服务收入', '产品销售', '主营业务', '分项', '分项收入', '条目']):
-            sub_vals.append((k, num))
-
-    if not has_total or not sub_vals:
-        return {
-            "id": "G1",
-            "name": "合计复算",
-            "status": "PASS",
-            "applicable": False,
-            "message": "未检测到多条目汇总结构，跳过合计复算"
-        }
-
-    sum_subs = sum(num for _, num in sub_vals)
-    tolerance = max(0.01, 1e-6 * abs(total_val))
-    diff = abs(total_val - sum_subs)
-
-    if diff <= tolerance:
-        return {
-            "id": "G1",
-            "name": "合计复算",
-            "status": "PASS",
-            "applicable": True,
-            "total": total_val,
-            "calculated_sum": sum_subs,
-            "diff": round(diff, 4),
-            "message": f"合计复算平衡 (合计 {total_val} == 各分项之和 {sum_subs})"
-        }
-    else:
-        return {
-            "id": "G1",
-            "name": "合计复算",
-            "status": "FAIL",
-            "applicable": True,
-            "total": total_val,
-            "calculated_sum": sum_subs,
-            "diff": round(diff, 4),
-            "message": f"合计复算不平: 报表合计为 {total_val}，分项实际之和为 {sum_subs}，差额 {round(diff, 2)}"
-        }
-
-
-def run_g2_audit(fields: List[Tuple[str, str]]) -> Dict[str, Any]:
-    """
-    G2 大小写一致:
-    小写金额 = 中文大写金额换算值 (支持拾佰仟万亿、角分、整)
-    """
-    lower_val = None
-    upper_parsed_val = None
-    upper_raw = None
-
-    for k, v in fields:
-        clean_k = re.sub(r'#\d+$', '', k).strip()
-        if '大写' in clean_k:
-            upper_raw = v
-            parsed = parse_cn_amount(v)
-            if parsed is not None:
-                upper_parsed_val = parsed
-        elif any(w in clean_k for w in ['合同金额', '总金额', '金额', '价款']) and '大写' not in clean_k:
-            try:
-                num = float(normalize_amount_string(v))
-                lower_val = num
-            except ValueError:
-                pass
-
-    if lower_val is None or upper_parsed_val is None:
-        return {
-            "id": "G2",
-            "name": "大小写一致",
-            "status": "PASS",
-            "applicable": False,
-            "message": "未同时检出小写金额与大写金额，跳过大小写一致校验"
-        }
-
-    tolerance = 0.01
-    diff = abs(lower_val - upper_parsed_val)
-    if diff <= tolerance:
-        return {
-            "id": "G2",
-            "name": "大小写一致",
-            "status": "PASS",
-            "applicable": True,
-            "lower": lower_val,
-            "upper_raw": upper_raw,
-            "upper_parsed": upper_parsed_val,
-            "message": f"大小写金额一致: 小写 {lower_val} 元，大写「{upper_raw}」"
-        }
-    else:
-        return {
-            "id": "G2",
-            "name": "大小写一致",
-            "status": "FAIL",
-            "applicable": True,
-            "lower": lower_val,
-            "upper_raw": upper_raw,
-            "upper_parsed": upper_parsed_val,
-            "message": f"大小写金额不符: 小写为 {lower_val} 元，大写「{upper_raw}」换算为 {upper_parsed_val} 元"
-        }
-
-
-def run_g3_audit(fields: List[Tuple[str, str]]) -> Dict[str, Any]:
-    """
-    G3 经营勾稽:
-    营业收入 - 营业成本 - 净利润 != 0 时仅提示，不参与丙级判定 (丙级只比 G1、G2)
-    """
-    rev = None
-    cost = None
-    profit = None
-
-    for k, v in fields:
-        clean_k = re.sub(r'#\d+$', '', k).strip()
-        val_str = normalize_amount_string(v)
-        try:
-            num = float(val_str)
-        except ValueError:
-            continue
-
-        if '营业收入' in clean_k or '主营业务收入' in clean_k:
-            rev = num
-        elif '营业成本' in clean_k or '主营业务成本' in clean_k:
-            cost = num
-        elif '净利润' in clean_k or '利润总额' in clean_k:
-            profit = num
-
-    if rev is None or cost is None or profit is None:
-        return {
-            "id": "G3",
-            "name": "经营勾稽",
-            "status": "PASS",
-            "applicable": False,
-            "message": "报表未完整包含收入、成本与净利润字段，跳过经营勾稽"
-        }
-
-    calc_profit = rev - cost
-    diff = abs(calc_profit - profit)
-    tolerance = max(0.01, 1e-6 * abs(profit))
-
-    if diff <= tolerance:
-        return {
-            "id": "G3",
-            "name": "经营勾稽",
-            "status": "PASS",
-            "applicable": True,
-            "revenue": rev,
-            "cost": cost,
-            "net_profit": profit,
-            "message": f"经营勾稽平衡 (营业收入 {rev} - 营业成本 {cost} == 净利润 {profit})"
-        }
-    else:
-        return {
-            "id": "G3",
-            "name": "经营勾稽",
-            "status": "WARN",
-            "applicable": True,
-            "revenue": rev,
-            "cost": cost,
-            "net_profit": profit,
-            "diff": round(diff, 2),
-            "message": f"经营勾稽提示: 营业收入 {rev} - 营业成本 {cost} = {calc_profit}，与报送净利润 {profit} 差异 {round(diff, 2)}（仅作经营分析提示，不影响结论等级）"
-        }
-
-
-def run_reconciliation_audits(fields: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
-    """运行全套勾稽审计 G1/G2/G3"""
-    return [run_g1_audit(fields), run_g2_audit(fields), run_g3_audit(fields)]
-
-
-# ==========================================================
-# 5.6 四级判定 (严格分诊式)
-# ==========================================================
-def diff_fields_with_tail_alignment(
-    registered_fields: List[Tuple[str, str]],
-    current_fields: List[Tuple[str, str]]
-) -> List[Dict[str, Any]]:
-    """
-    语义字段比对:
-    附加规则: 键尾 OCR 伪影对齐: 字段键仅尾部数字不同且值相同者视为同键 (防扫描件标签噪声误判丁)
-    值不同绝不适用此条！
-    """
-    reg_dict = dict(registered_fields)
-    curr_dict = dict(current_fields)
-
-    diffs = []
-    visited_curr_keys = set()
-
-    for r_k, r_v in registered_fields:
-        if r_k in curr_dict:
-            c_v = curr_dict[r_k]
-            visited_curr_keys.add(r_k)
-            if c_v != r_v:
-                diffs.append({
-                    "field": r_k,
-                    "registered_val": r_v,
-                    "current_val": c_v,
-                    "reason": "字段值被篡改"
-                })
-        else:
-            # 尝试键尾 OCR 伪影对齐 (如 合计#2 与 合计 且值相同)
-            aligned_match = None
-            base_rk = re.sub(r'#\d+$', '', r_k)
-            for c_k, c_v in curr_dict.items():
-                if c_k not in visited_curr_keys:
-                    base_ck = re.sub(r'#\d+$', '', c_k)
-                    if base_rk == base_ck and c_v == r_v:
-                        aligned_match = c_k
-                        break
-
-            if aligned_match:
-                visited_curr_keys.add(aligned_match)
-                # 键尾对齐且值相同，视为未改
+def _cn_int(s: str):
+    """中文大写整数部分 -> int; 含非法字符返回 None。"""
+    total, section, num = 0, 0, 0
+    for ch in s:
+        if ch in _CN_DIGITS:
+            num = _CN_DIGITS[ch]
+        elif ch in _CN_UNITS:
+            u = _CN_UNITS[ch]
+            if u >= 10000:
+                section = (section + num) * u
+                total += section
+                section, num = 0, 0
             else:
-                diffs.append({
-                    "field": r_k,
-                    "registered_val": r_v,
-                    "current_val": "【已缺失/未抽取到】",
-                    "reason": "字段在当前待验文件中缺失"
-                })
-
-    return diffs
-
-
-def judge_four_tier_grade(
-    exact_match: bool,
-    registered_record: Optional[Dict[str, Any]],
-    current_fields: Optional[List[Tuple[str, str]]],
-    registered_fields: Optional[List[Tuple[str, str]]],
-    perceptual_passed: Optional[bool],
-    perceptual_stats: Dict[str, Any],
-    current_audits: List[Dict[str, Any]],
-    start_time_ns: int,
-    key_status: str = "VALID", # "VALID", "REVOKED", "DISPUTED"
-) -> Dict[str, Any]:
-    """
-    严格按照 5.6 四级判定顺序命中:
-    前置:
-      1. 凭证已作废 -> 结论「已作废」终止
-      2. 状态争议 -> 照常判但结论加注
-      3. 登记密钥已失效 -> 照常判但加注
-    顺序:
-      1. 精确双根全部一致 -> 甲级 · 原件未动 (基线 99%)
-      2. 任一语义字段值与登记不同 (含被删) -> 丁级 · 关键字段被改 (基线 95%)
-      3. 字段未变，但出现登记时没有的新勾稽问题 (仅 G1/G2) -> 丙级 · 内容自相矛盾 (基线 85%)
-      4. 字段未变且感知通过 (汉明 <= 8 或相似度 >= 0.90) -> 乙级 · 载体变、内容等价 (基线 75-90%)
-      5. 其余情形 -> 待人工复核 (<= 40%)
-    """
-    elapsed_ms = max(1, int((time.perf_counter_ns() - start_time_ns) / 1_000_000))
-    reasons: List[str] = []
-    caps: List[int] = []
-
-    # 1. 前置状态处理
-    if registered_record:
-        rec_status = registered_record.get("status", "有效")
-        if rec_status == "已作废":
-            return {
-                "grade": "已作废",
-                "label": "凭证已作废",
-                "color": "#94A3B8",
-                "seal_text": "作废",
-                "confidence": 100,
-                "reasons": ["此登记记录已被登记方私钥正式签名作废，链上凭证不再受采信。"],
-                "elapsed_ms": elapsed_ms,
-                "diff_table": []
-            }
-        elif rec_status == "争议":
-            reasons.append("【链上警示】该凭证处于争议公告存续状态，下述结论照常输出但请审慎使用。")
-
-    if key_status == "REVOKED":
-        reasons.append("【密钥状态提示】原登记私钥已发布公钥失效公告，历史记录签名仍保留存证效力。")
-    elif key_status == "DISPUTED":
-        reasons.append("【密钥状态提示】原登记私钥已列入争议公告，需待澄清。")
-
-    # 检查未登记文件
-    if registered_record is None:
-        # 未登记文件: 只做勾稽审计
-        has_g1_fail = any(a["id"] == "G1" and a["status"] == "FAIL" for a in current_audits)
-        has_g2_fail = any(a["id"] == "G2" and a["status"] == "FAIL" for a in current_audits)
-        if has_g1_fail or has_g2_fail:
-            reasons.append("该文件未在数玺账本中登记，经本地勾稽审计发现内部账目数据自相矛盾。")
-            if has_g1_fail:
-                reasons.append("合计复算存在差额，同列或同行分项条目与报表合计不符。")
-            if has_g2_fail:
-                reasons.append("小写金额与中文大写金额计算值不一致。")
-            return {
-                "grade": "丙级",
-                "label": "丙级 · 内容自相矛盾",
-                "color": "#FBBF24",
-                "seal_text": "丙级",
-                "confidence": 85,
-                "reasons": reasons,
-                "elapsed_ms": elapsed_ms,
-                "diff_table": []
-            }
+                section += (num or 1) * u
+                num = 0
         else:
-            reasons.append("该文件未在数玺账本中登记存证。")
-            reasons.append("文件内部数据未发现明显勾稽异常（注意：勾稽未见异常不等于内容本身真实）。")
-            return {
-                "grade": "未登记",
-                "label": "未登记，勾稽未见异常（不等于真实）",
-                "color": "#94A3B8",
-                "seal_text": "复核",
-                "confidence": 50,
-                "reasons": reasons,
-                "elapsed_ms": elapsed_ms,
-                "diff_table": []
-            }
+            return None
+    return total + section + num
 
-    # 页数不一致规则 (5.3 规则 3): 感知哈希不参与判定，把握封顶 70%，结论注明页数差异
-    page_count_mismatch = perceptual_stats.get("page_count_mismatch", False)
-    if page_count_mismatch:
-        caps.append(70)
-        reasons.append(f"文件页数与登记记录不一致 (原文件 {perceptual_stats.get('reg_pages', 1)} 页，待验文件 {perceptual_stats.get('curr_pages', 1)} 页)，把握封顶 70%。")
 
-    # 附加规则: 登记方未出示登记包 (无字段表) 或 待验文件抽不出字段
-    no_registration_pack = (registered_fields is None)
-    no_current_fields = (current_fields is None or len(current_fields) == 0)
+def chinese_amount(text: str):
+    """中文大写金额 -> Decimal 元 (含角/分); 解析失败返回 None。"""
+    m = re.search(r"([零壹贰叁肆伍陆柒捌玖拾佰仟万亿]+)(?:元|圆)([零壹贰叁肆伍陆柒捌玖]角)?"
+                  r"([零壹贰叁肆伍陆柒捌玖]分)?整?", text)
+    if not m:
+        return None
+    whole = _cn_int(m.group(1))
+    if whole is None:
+        return None
+    val = Decimal(whole)
+    if m.group(2):
+        val += Decimal(_CN_DIGITS[m.group(2)[0]]) * Decimal("0.1")
+    if m.group(3):
+        val += Decimal(_CN_DIGITS[m.group(3)[0]]) * Decimal("0.01")
+    return val
 
-    # 1. 顺位 1: 精确双根全部一致 -> 甲级 · 原件未动
-    if exact_match:
-        reasons.append("精确层 SHA-256 与 SM3 国密双 Merkle 根与账本存证 100% 逐比特完全一致。")
-        reasons.append("文件自登记确权以来，未发生任何字节级篡改或重新格式化。")
-        # 丙级相对基准：与登记时相同的勾稽老问题不构成丙级，只注明（甲级同理，注明不改级）
-        old_audit = registered_record.get("audit_results", [])
-        if any("FAIL" in str(r) for r in old_audit):
-            reasons.append("注：该文件登记时即存在历史勾稽警示，因双根完全匹配，原件确权保持甲级。")
-        conf = 99
-        if caps:
-            conf = min(conf, min(caps))
-        return {
-            "grade": "甲级",
-            "label": "甲级 · 原件未动",
-            "color": "#34D399",
-            "seal_text": "甲级",
-            "confidence": conf,
-            "reasons": reasons,
-            "elapsed_ms": elapsed_ms,
-            "diff_table": []
-        }
 
-    # 缺少登记包或抽不出字段的分支
-    if no_registration_pack or no_current_fields:
-        sub_reason = "登记方未出示登记包（无法提取字段明文比对）" if no_registration_pack else "待验文件未能抽取出带标签语义字段"
-        reasons.append(f"精确层双根发生变动（非原始字节）；且{sub_reason}。")
-        caps.append(60)
-        if perceptual_passed:
-            reasons.append("第二层感知指纹（pHash 或文本相似度）比对通过，版面布局与内容等价。")
-            reasons.append("依据协议规则：缺乏语义字段表但感知通过时，判定为乙级，把握封顶 60%，建议人工复核关键页。")
-            conf = min(60, min(caps))
-            return {
-                "grade": "乙级",
-                "label": "乙级 · 载体变、内容等价",
-                "color": "#38BDF8",
-                "seal_text": "乙级",
-                "confidence": conf,
-                "reasons": reasons,
-                "elapsed_ms": elapsed_ms,
-                "diff_table": []
-            }
-        else:
-            reasons.append("第二层感知指纹比对亦未通过或页面形态发生较大差异。")
-            reasons.append("依据协议规则：转入待人工复核。")
-            conf = min(40, min(caps))
-            return {
-                "grade": "待人工复核",
-                "label": "待人工复核",
-                "color": "#A78BFA",
-                "seal_text": "复核",
-                "confidence": conf,
-                "reasons": reasons,
-                "elapsed_ms": elapsed_ms,
-                "diff_table": []
-            }
+# ---------------------------------------------------------------- 勾稽审计
 
-    # 计算字段差异 (带尾部 OCR 伪影对齐)
-    field_diffs = diff_fields_with_tail_alignment(registered_fields, current_fields)
+def _num(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        c = fp.canon_amount(v)
+        if c is not None and "%" not in v:
+            try:
+                return float(c)
+            except ValueError:
+                return None
+    return None
 
-    # 2. 顺位 2: 任一语义字段值与登记不同 (含被删) -> 丁级 · 关键字段被改
-    if len(field_diffs) > 0:
-        reasons.append(f"语义指纹比对发现异常：检出 {len(field_diffs)} 处关键业务字段值被改动或缺失。")
-        for d in field_diffs[:5]:
-            reasons.append(f"字段「{d['field']}」：登记值为「{d['registered_val']}」，当前值为「{d['current_val']}」")
-        if len(field_diffs) > 5:
-            reasons.append(f"... 及其余 {len(field_diffs) - 5} 处字段变动。")
-        conf = 95
-        if caps:
-            conf = min(conf, min(caps))
-        return {
-            "grade": "丁级",
-            "label": "丁级 · 关键字段被改",
-            "color": "#FB7185",
-            "seal_text": "丁级",
-            "confidence": conf,
-            "reasons": reasons,
-            "elapsed_ms": elapsed_ms,
-            "diff_table": field_diffs
-        }
 
-    # 3. 顺位 3: 字段未变，但出现登记时没有的新勾稽问题 (仅 G1/G2) -> 丙级 · 内容自相矛盾
-    reg_audits_str = str(registered_record.get("audit_results", []))
-    old_g1_fail = "G1-FAIL" in reg_audits_str
-    old_g2_fail = "G2-FAIL" in reg_audits_str
+def audit(data: bytes, ext: str, text: str, fields: dict) -> dict:
+    """返回 {issues: [{code, key, msg}], hints: [str]}。issues 仅含 G1/G2。"""
+    issues: list[dict] = []
+    hints: list[str] = []
 
-    curr_g1_fail = any(a["id"] == "G1" and a["status"] == "FAIL" for a in current_audits)
-    curr_g2_fail = any(a["id"] == "G2" and a["status"] == "FAIL" for a in current_audits)
+    # G1 合计复算
+    for grid in fp.extract_tables(data, ext):
+        if not grid:
+            continue
+        ncols = max((len(r) for r in grid), default=0)
+        # 列向: 标签在首列, 数值在同列上方累加
+        for c in range(1, ncols):
+            for r, row in enumerate(grid):
+                label = str(row[0]) if row and row[0] is not None else ""
+                if "合计" not in label and "总计" not in label:
+                    continue
+                total = _num(row[c]) if c < len(row) else None
+                if total is None:
+                    continue
+                items = []
+                for up in grid[:r]:
+                    lab = str(up[0]) if up and up[0] is not None else ""
+                    if "合计" in lab or "总计" in lab:
+                        continue
+                    v = _num(up[c]) if c < len(up) else None
+                    if v is not None:
+                        items.append(v)
+                if len(items) >= 2 and abs(sum(items) - total) > max(TOL_ABS, abs(total) * TOL_REL):
+                    issues.append({
+                        # key 用 标签+合计值 (不用列号/行号): 表格插行后
+                        # 同一老问题仍同 key, 不被误判为新问题 (相对丙基准)
+                        "code": "G1", "key": f"G1|{label}|{total:g}",
+                        "msg": f"「{label}」列条目之和 {sum(items):g} ≠ 合计 {total:g}"})
+        # 行向: 同行 合计标签 + 多个数值, 末位为合计
+        for row in grid:
+            labels = [str(x) for x in row if isinstance(x, str)]
+            if not any("合计" in x or "总计" in x for x in labels):
+                continue
+            nums = [v for v in (_num(x) for x in row) if v is not None]
+            if len(nums) >= 3:
+                total, items = nums[-1], nums[:-1]
+                if abs(sum(items) - total) > max(TOL_ABS, abs(total) * TOL_REL):
+                    lab = next(x for x in labels if "合计" in x or "总计" in x)
+                    issues.append({
+                        "code": "G1", "key": f"G1|{lab}|{total:g}",
+                        "msg": f"「{lab}」行条目之和 {sum(items):g} ≠ 合计 {total:g}"})
 
-    new_g1_problem = curr_g1_fail and not old_g1_fail
-    new_g2_problem = curr_g2_fail and not old_g2_fail
+    # G2 金额大小写一致
+    m_small = re.search(r"(?:金额|价款|总价|合同价)[^0-9]{0,6}([0-9][0-9,．.]*)\s*元", text or "")
+    if m_small and ("大写" in (text or "") or "人民币" in (text or "")):
+        big = chinese_amount(text or "")
+        small = fp.canon_amount(m_small.group(1) + "元")
+        if big is not None and small is not None and abs(Decimal(small) - big) > Decimal("0.01"):
+            issues.append({
+                "code": "G2", "key": "G2|金额大小写",
+                "msg": f"金额小写 {small} 元 ≠ 大写换算 {big} 元"})
 
-    if new_g1_problem or new_g2_problem:
-        reasons.append("关键语义字段虽未改变，但文件内部复算触发登记时不存在的新勾稽矛盾。")
-        if new_g1_problem:
-            reasons.append("新检出 G1 合计复算不平：各分项明细之和与报表合计金额不一致。")
-        if new_g2_problem:
-            reasons.append("新检出 G2 大小写不符：阿拉伯小写金额与中文大写金额计算值矛盾。")
-        conf = 85
-        if caps:
-            conf = min(conf, min(caps))
-        return {
-            "grade": "丙级",
-            "label": "丙级 · 内容自相矛盾",
-            "color": "#FBBF24",
-            "seal_text": "丙级",
-            "confidence": conf,
-            "reasons": reasons,
-            "elapsed_ms": elapsed_ms,
-            "diff_table": []
-        }
+    # G3 字段间勾稽 (仅提示)
+    if all(k in fields for k in ("营业收入", "营业成本", "净利润")):
+        try:
+            diff = (Decimal(fields["营业收入"]) - Decimal(fields["营业成本"])
+                    - Decimal(fields["净利润"]))
+            if diff != 0:
+                hints.append(f"G3 提示: 营业收入-营业成本-净利润 = {diff} (可能含其他收支, 仅提示)")
+        except Exception:
+            pass
 
-    # 4. 顺位 4: 字段未变且感知通过 (汉明 <= 8 或相似度 >= 0.90) -> 乙级 · 载体变、内容等价
-    if perceptual_passed:
-        reasons.append("语义层全部关键字段与登记记录 100% 吻合，业务事实未变。")
-        p_reasons = []
-        if perceptual_stats.get("avg_hamming") is not None and perceptual_stats["avg_hamming"] <= 8:
-            p_reasons.append(f"页面 pHash 平均汉明距离 {perceptual_stats['avg_hamming']:.2f} <= 8（长相未变）")
-        if perceptual_stats.get("text_sim") is not None and perceptual_stats["text_sim"] >= 0.90:
-            p_reasons.append(f"文本 3-gram 相似度 {perceptual_stats['text_sim']:.4f} >= 0.90（文本等价）")
-        reasons.append(f"第二层感知指纹校验通过：{', '.join(p_reasons)}。")
-        reasons.append("判定该文件为转格式、打印翻拍或轻微排版重存等价件，有效内容保持完整真实。")
-        # 乙级基线 75 - 90%
-        base_conf = 88
-        if caps:
-            conf = min(base_conf, min(caps))
-        else:
-            conf = base_conf
-        return {
-            "grade": "乙级",
-            "label": "乙级 · 载体变、内容等价",
-            "color": "#38BDF8",
-            "seal_text": "乙级",
-            "confidence": conf,
-            "reasons": reasons,
-            "elapsed_ms": elapsed_ms,
-            "diff_table": []
-        }
+    # 去重 (同一 key 只报一次)
+    seen, uniq = set(), []
+    for i in issues:
+        if i["key"] not in seen:
+            seen.add(i["key"])
+            uniq.append(i)
+    return {"issues": uniq, "hints": hints}
 
-    # 5. 顺位 5: 其余情形 -> 待人工复核
-    reasons.append("精确层双根不同；虽字段抽取未见明显异常，但感知指纹差异超出容许阈值。")
-    reasons.append("排版布局或自由文本发生不可信漂移，系统判定需转入待人工复核。")
-    conf = min(40, min(caps) if caps else 40)
-    return {
-        "grade": "待人工复核",
-        "label": "待人工复核",
-        "color": "#A78BFA",
-        "seal_text": "复核",
-        "confidence": conf,
-        "reasons": reasons,
-        "elapsed_ms": elapsed_ms,
-        "diff_table": []
-    }
+
+def _align_ocr_keys(fields: dict, other: dict) -> dict:
+    """把仅键尾数字不同、且值与对方同名键相同的键对齐到对方键名。
+    例: OCR 把'服务收入 |'读成'服务收入1' — 值未变, 属标签噪声。"""
+    out = dict(fields)
+    for k in list(out):
+        if k not in other and re.search(r"\d$", k):
+            base = k.rstrip("0123456789")
+            if base in other and other[base] == out[k] and base not in out:
+                out[base] = out.pop(k)
+    return out
+
+
+# ---------------------------------------------------------------- 四级判定
+
+def grade(reg: dict, cand: dict, reg_audit: dict, cand_audit: dict,
+          reg_fields: dict | None, status: str = "有效",
+          annotations: list[str] | None = None) -> dict:
+    """reg 为 fp.public_view 结构 (登记记录侧); cand 为 fp.compute_all 结构
+    (待验文件当场计算); reg_fields 为登记包出示的字段表 (可为 None)。
+    返回 {grade, confidence, reasons, evidence}。"""
+    reasons: list[str] = list(annotations or [])
+    evidence: dict = {}
+
+    if status == "已作废":
+        return {"grade": "已作废", "confidence": 1.0,
+                "reasons": ["凭证已被登记方作废, 不进入分级判定"], "evidence": evidence}
+    if status == "争议":
+        reasons.append("该登记处于争议状态 (规范第 11 节)")
+
+    cand_exact = cand["exact"]
+    cand_phashes = cand["perceptual"]["phashes"]
+    cand_sem_root = cand["semantic"]["root"]
+    cand_text = cand["text"]
+    cand_fields = cand["fields"]
+    # 登记侧原文不进登记记录 (规范 §2); 由调用方以 reg["text"] 另行传入,
+    # 缺失时按空文本处理 (相似度记不可用/0, 由其余证据定级)。
+    reg_text = reg.get("text", "")
+
+    exact = (reg["exact"]["sha256_root"] == cand_exact["sha256_root"]
+             and reg["exact"]["sm3_root"] == cand_exact["sm3_root"])
+    evidence["exact"] = exact
+    reg_keys = {i["key"] for i in reg_audit["issues"]}
+    cand_issues = cand_audit["issues"]
+
+    if exact:
+        reasons.append("精确双根 (SHA-256 与 SM3) 与登记完全一致, 原件未动")
+        same = [i["msg"] for i in cand_issues if i["key"] in reg_keys]
+        if same:
+            reasons.append("注: 原文自带勾稽问题 (登记时即如此, 不改级): " + "; ".join(same))
+        return {"grade": "甲级", "confidence": 0.99, "reasons": reasons, "evidence": evidence}
+
+    # 字段比对 (规范 §6: 允许键尾 OCR 伪影对齐 — 键仅尾部数字不同
+    # 且值相同者视为同键; 值不同绝不对齐, 防真篡改借对齐脱身)
+    cand_fields = _align_ocr_keys(cand_fields, reg_fields) if reg_fields else cand_fields
+    diffs: list[dict] = []
+    fields_known = reg_fields is not None
+    if fields_known:
+        reg_aligned = _align_ocr_keys(reg_fields, cand_fields)
+        for k in sorted(set(reg_aligned) | set(cand_fields), key=lambda x: x.encode("utf-8")):
+            if reg_aligned.get(k) != cand_fields.get(k):
+                diffs.append({"field": k, "registered": reg_aligned.get(k),
+                              "candidate": cand_fields.get(k)})
+    fields_changed = bool(diffs)
+    roots_equal = reg["semantic_root"] == cand_sem_root
+    # 规范 §6 (v1.3): 字段一项"无法核验"的两种情形 —
+    #   (a) 登记方未出示字段表: 语义根经加盐, 无盐不可复算比对
+    #       (v1.2 的"比根判丁级嫌疑"路径与加盐设计矛盾, 已删除);
+    #   (b) 待验文件抽不出字段而登记侧有字段: 抽不出 != 被删改。
+    # 无法核验时不判丁, 走感知判定, 命中乙级把握封顶 60%。
+    empty_sem_root = fp.merkle_root("sha256", [])
+    reg_has_fields = reg["semantic_root"] != empty_sem_root
+    fields_unverifiable = (not fields_known) or (not cand_fields and reg_has_fields)
+    evidence["field_diffs"] = diffs
+    evidence["semantic_root_equal"] = roots_equal
+    evidence["fields_unverifiable"] = fields_unverifiable
+
+    if fields_known and fields_changed and not fields_unverifiable:
+        reasons.append(f"关键字段被改动 {len(diffs)} 处 (见差异表)")
+        return {"grade": "丁级", "confidence": 0.95, "reasons": reasons, "evidence": evidence}
+
+    # 丙级 (相对基准: 只判登记后新增的 G1/G2 问题)
+    new_issues = [i for i in cand_issues if i["key"] not in reg_keys]
+    if new_issues:
+        reasons.append("文件出现登记时没有的勾稽问题: "
+                       + "; ".join(i["msg"] for i in new_issues))
+        return {"grade": "丙级", "confidence": 0.85, "reasons": reasons, "evidence": evidence}
+
+    # 感知层
+    rp, cp = reg["phashes"], cand_phashes
+    page_mismatch = len(rp) != len(cp)
+    dist = None
+    if rp and cp and not page_mismatch:
+        dist = sum(fp.hamming_hex(a, b) for a, b in zip(rp, cp)) / len(rp)
+    sim = fp.text_similarity(reg_text, cand_text)
+    evidence["phash_mean_dist"] = dist
+    evidence["text_sim"] = sim
+    evidence["page_mismatch"] = page_mismatch
+    perc_pass = (dist is not None and dist <= 8) or (sim is not None and sim >= 0.90)
+
+    if perc_pass:
+        base = 0.90 if (dist is not None and dist <= 4) or (sim is not None and sim >= 0.98) else 0.75
+        caps = []
+        if page_mismatch:
+            caps.append(0.70)
+            reasons.append("页数与登记不一致, 感知哈希不参与判定, 把握封顶 70%")
+        if fields_unverifiable:
+            caps.append(0.60)
+            if not fields_known:
+                reasons.append("登记方未出示字段表, 字段一项无法核验, 把握封顶 60%, 建议人工复核关键页")
+            else:
+                reasons.append("待验文件抽不出语义字段, 字段一项无法核验, 把握封顶 60%, 建议人工复核关键页")
+        conf = min([base] + caps)
+        reasons.append("字节已变, 但页面长相/文本与关键事实未变 — 载体变更, 内容等价")
+        return {"grade": "乙级", "confidence": conf, "reasons": reasons, "evidence": evidence}
+
+    reasons.append("三层证据不足以定级 (字段未变但感知层不通过, 或字段与感知均不可用), 按规范不下结论")
+    return {"grade": "待人工复核", "confidence": 0.40, "reasons": reasons, "evidence": evidence}
+
+
+def grade_standalone(cand_audit: dict) -> dict:
+    if cand_audit["issues"]:
+        return {"grade": "丙级", "confidence": 0.85,
+                "reasons": ["未登记文件, 仅作勾稽审计: "
+                            + "; ".join(i["msg"] for i in cand_audit["issues"])],
+                "evidence": {}}
+    return {"grade": "未登记", "confidence": 0.30,
+            "reasons": ["该文件未登记, 勾稽未见异常 — 未登记 ≠ 真实"],
+            "evidence": {}}

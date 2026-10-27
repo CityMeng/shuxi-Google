@@ -1,330 +1,334 @@
+# -*- coding: utf-8 -*-
 """
-数玺 · 哈希链账本与密码学模块 (engine/ledger.py)
-规范版本: 1.3
-套件标识: SXA1
-包含:
-1. RFC 8785 规范 JSON 序列化 (禁止浮点数)
-2. Ed25519 密钥生成、签名与验签 (原生 pure-Python + cryptography 双重支持)
-3. JSONL 哈希链账本 (登记/授权/回执/作废/检查点/密钥公告)
-4. 全链完整性校验与链头查询
-"""
+数玺核心引擎 · 账本与密钥 (实现《数玺协议规范 v1.2》第 2、11、12 节)
 
-import os
-import json
-import time
+设计要点 (含社区通行做法的采纳记录):
+  - 规范序列化: 等价 RFC 8785 (JCS) — 键按字典序、紧凑分隔符、UTF-8、
+    禁 NaN; 且负载中**禁止浮点数** (社区共识: 数字是签名跨实现翻车的
+    头号原因), 一切数值以 int 或 str 形式入账。
+  - 哈希链: JSONL 追加写; 条目哈希 = SHA-256(域标签 | 上条哈希 | 规范
+    序列化), 每条自带签名者公钥与 Ed25519 签名 (规范允许 SM2 或
+    Ed25519, 本实现选 Ed25519), 任何人离线可验全链。
+  - 检查点即"封印": 含条目序号与链头哈希, 预留外部时间锚字段
+    (RFC 3161 / 公链), 防尾部截断在锚定后不可隐匿。
+  - 私钥只存登记包, 以口令加密的 PEM 形式落盘 (规范 §11)。
+"""
+from __future__ import annotations
+
+import base64
 import hashlib
-from typing import List, Dict, Any, Tuple, Optional
+import json
+import os
+from datetime import datetime, timedelta, timezone
 
-GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
-
-# ==========================================================
-# 5.1 规范序列化 (RFC 8785 紧凑规范 JSON，禁止浮点数)
-# ==========================================================
-def canonical_serialize(obj: Any) -> bytes:
-    """
-    按协议 5.1 规范序列化:
-    - 键按英文字典序或固定协议顺序
-    - JSON 紧凑编码 (separators=(',', ':'))
-    - UTF-8 编码
-    - 严禁浮点数 (float 抛出 ValueError)
-    """
-    def check_no_float(o: Any):
-        if isinstance(o, float):
-            raise ValueError(f"协议 5.1 严禁在账本载荷中出现浮点数: {o}")
-        elif isinstance(o, dict):
-            for k, v in o.items():
-                check_no_float(v)
-        elif isinstance(o, (list, tuple)):
-            for item in o:
-                check_no_float(item)
-
-    check_no_float(obj)
-    serialized = json.dumps(obj, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
-    return serialized.encode('utf-8')
+TZ = timezone(timedelta(hours=8))
+GENESIS_HASH = "0" * 64
+_ENTRY_DOMAIN = b"shuxi-entry-v1\x00"
 
 
-# ==========================================================
-# 密码学: Ed25519 签名与验签
-# ==========================================================
-# RFC 8032 纯 Python Ed25519 实现
-b = 256
-q = 2**255 - 19
-l = 2**252 + 27742317777372353535851937790883648493
+def now_iso() -> str:
+    return datetime.now(TZ).isoformat(timespec="seconds")
 
-def _inv(x: int) -> int:
-    return pow(x, q - 2, q)
 
-d = -121665 * _inv(121666)
-I = pow(2, (q - 1) // 4, q)
+def parse_ts(ts: str) -> datetime:
+    return datetime.fromisoformat(ts)
 
-def _xrecover(y: int) -> int:
-    xx = (y * y - 1) * _inv(d * y * y + 1)
-    x = pow(xx, (q + 3) // 8, q)
-    if (x * x - xx) % q != 0:
-        x = (x * I) % q
+
+# ---------------------------------------------------------------- 规范序列化
+
+def _reject_floats(obj, path="$"):
+    if isinstance(obj, float):
+        raise ValueError(f"canonical: 负载禁止浮点数 ({path}), 请改用 int 或 str")
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            _reject_floats(v, f"{path}.{k}")
+    elif isinstance(obj, (list, tuple)):
+        for i, v in enumerate(obj):
+            _reject_floats(v, f"{path}[{i}]")
+
+
+def canonical_bytes(obj) -> bytes:
+    """RFC 8785 等价的规范序列化 (键字典序/紧凑/UTF-8/禁 NaN 与浮点)。"""
+    _reject_floats(obj)
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+# ---------------------------------------------------------------- 密钥
+
+# RFC 8032 Pure-Python Ed25519 implementation for fallback
+_P_ED = 2**255 - 19
+_D_ED = -121665 * pow(121666, -1, _P_ED) % _P_ED
+_I_ED = pow(2, (_P_ED - 1) // 4, _P_ED)
+_L_ED = 2**252 + 27742317777372353535851937790883648493
+
+def _inv_ed(x):
+    return pow(x, -1, _P_ED)
+
+def _xrecover_ed(y):
+    xx = (y * y - 1) * _inv_ed(_D_ED * y * y + 1) % _P_ED
+    x = pow(xx, (_P_ED + 3) // 8, _P_ED)
+    if (x * x - xx) % _P_ED != 0:
+        x = (x * _I_ED) % _P_ED
     if x % 2 != 0:
-        x = q - x
+        x = _P_ED - x
     return x
 
-By = 4 * _inv(5)
-Bx = _xrecover(By)
-B = [Bx % q, By % q]
+_BY_ED = 4 * _inv_ed(5) % _P_ED
+_BX_ED = _xrecover_ed(_BY_ED)
+_BASE_POINT = (_BX_ED, _BY_ED)
 
 def _edwards_add(P, Q):
-    x1, y1 = P[0], P[1]
-    x2, y2 = Q[0], Q[1]
-    x3 = (x1 * y2 + x2 * y1) * _inv(1 + d * x1 * x2 * y1 * y2)
-    y3 = (y1 * y2 + x1 * x2) * _inv(1 - d * x1 * x2 * y1 * y2)
-    return [x3 % q, y3 % q]
+    x1, y1 = P
+    x2, y2 = Q
+    x3 = (x1 * y2 + x2 * y1) * _inv_ed(1 + _D_ED * x1 * x2 * y1 * y2) % _P_ED
+    y3 = (y1 * y2 + x1 * x2) * _inv_ed(1 - _D_ED * x1 * x2 * y1 * y2) % _P_ED
+    return (x3, y3)
 
-def _scalarmult(P, e):
-    if e == 0:
-        return [0, 1]
-    Q = _scalarmult(P, e // 2)
-    Q = _edwards_add(Q, Q)
-    if e & 1:
-        Q = _edwards_add(Q, P)
+def _scalarmult_ed(P, e):
+    Q = (0, 1)
+    while e > 0:
+        if e & 1:
+            Q = _edwards_add(Q, P)
+        P = _edwards_add(P, P)
+        e >>= 1
     return Q
 
-def _encodeint(y):
-    bits = [(y >> i) & 1 for i in range(b)]
-    return bytes([sum([bits[i * 8 + j] << j for j in range(8)]) for i in range(b // 8)])
+def _encodepoint_ed(P):
+    x, y = P
+    bits = [(y >> i) & 1 for i in range(255)] + [x & 1]
+    return bytes(sum(bits[i * 8 + j] << j for j in range(8)) for i in range(32))
 
-def _encodepoint(P):
-    x, y = P[0], P[1]
-    bits = [(y >> i) & 1 for i in range(b - 1)] + [x & 1]
-    return bytes([sum([bits[i * 8 + j] << j for j in range(8)]) for i in range(b // 8)])
+def _decodepoint_ed(s):
+    y = sum(2**i * ((s[i // 8] >> (i % 8)) & 1) for i in range(255))
+    x = _xrecover_ed(y)
+    if x & 1 != ((s[31] >> 7) & 1):
+        x = _P_ED - x
+    return (x, y)
 
-def _bit(h, i):
-    return (h[i // 8] >> (i % 8)) & 1
-
-def _decodeint(s):
-    return sum(2**i * _bit(s, i) for i in range(0, b))
-
-def _decodepoint(s):
-    y = sum(2**i * _bit(s, i) for i in range(0, b - 1))
-    x = _xrecover(y)
-    if x & 1 != _bit(s, b - 1):
-        x = q - x
-    P = [x, y]
-    return P
-
-def _hint(m):
-    h = hashlib.sha512(m).digest()
-    return sum(2**i * _bit(h, i) for i in range(2 * b))
-
-def ed25519_publickey(sk: bytes) -> bytes:
+def _pure_ed25519_sign(m: bytes, sk: bytes) -> bytes:
     h = hashlib.sha512(sk).digest()
-    a = 2**(b - 2) + sum(2**i * _bit(h, i) for i in range(3, b - 2))
-    A = _scalarmult(B, a)
-    return _encodepoint(A)
+    a = 2**254 + sum(2**i * ((h[i // 8] >> (i % 8)) & 1) for i in range(3, 254))
+    r = int.from_bytes(hashlib.sha512(h[32:] + m).digest(), "little") % _L_ED
+    R = _scalarmult_ed(_BASE_POINT, r)
+    A = _scalarmult_ed(_BASE_POINT, a)
+    Rs = _encodepoint_ed(R)
+    As = _encodepoint_ed(A)
+    k = int.from_bytes(hashlib.sha512(Rs + As + m).digest(), "little") % _L_ED
+    S = (r + k * a) % _L_ED
+    return Rs + S.to_bytes(32, "little")
 
-def ed25519_sign(msg: bytes, sk: bytes, pk: bytes) -> bytes:
-    h = hashlib.sha512(sk).digest()
-    a = 2**(b - 2) + sum(2**i * _bit(h, i) for i in range(3, b - 2))
-    r = _hint(h[b // 8:] + msg)
-    R = _scalarmult(B, r)
-    k = _hint(_encodepoint(R) + pk + msg)
-    S = (r + k * a) % l
-    return _encodepoint(R) + _encodeint(S)
-
-def ed25519_verify(sig: bytes, msg: bytes, pk: bytes) -> bool:
-    if len(sig) != 64 or len(pk) != 32:
+def _pure_ed25519_verify(s: bytes, m: bytes, pk: bytes) -> bool:
+    if len(s) != 64 or len(pk) != 32:
         return False
     try:
-        R = _decodepoint(sig[:32])
-        A = _decodepoint(pk)
-        S = _decodeint(sig[32:])
-        h = _hint(sig[:32] + pk + msg)
-        v1 = _scalarmult(B, S)
-        v2 = _edwards_add(R, _scalarmult(A, h))
-        return v1[0] == v2[0] and v1[1] == v2[1]
+        R = _decodepoint_ed(s[:32])
+        A = _decodepoint_ed(pk)
+        S = int.from_bytes(s[32:], "little")
+        if S >= _L_ED:
+            return False
+        k = int.from_bytes(hashlib.sha512(s[:32] + pk + m).digest(), "little") % _L_ED
+        return _scalarmult_ed(_BASE_POINT, S) == _edwards_add(R, _scalarmult_ed(A, k))
+    except Exception:
+        return False
+
+def _pure_ed25519_pub(sk: bytes) -> bytes:
+    h = hashlib.sha512(sk).digest()
+    a = 2**254 + sum(2**i * ((h[i // 8] >> (i % 8)) & 1) for i in range(3, 254))
+    return _encodepoint_ed(_scalarmult_ed(_BASE_POINT, a))
+
+
+class KeyPair:
+    """Ed25519 密钥对 (规范 §2 允许 SM2 或 Ed25519)。"""
+
+    def __init__(self, priv, seed: bytes = None):
+        self._priv = priv
+        self._seed = seed
+
+    @classmethod
+    def generate(cls) -> "KeyPair":
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+            return cls(Ed25519PrivateKey.generate())
+        except ImportError:
+            seed = os.urandom(32)
+            return cls(None, seed=seed)
+
+    @property
+    def public_raw(self) -> bytes:
+        if self._priv is not None:
+            from cryptography.hazmat.primitives import serialization
+            return self._priv.public_key().public_bytes(
+                serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        return _pure_ed25519_pub(self._seed)
+
+    @property
+    def public_b64(self) -> str:
+        return base64.b64encode(self.public_raw).decode()
+
+    @property
+    def fingerprint(self) -> str:
+        return hashlib.sha256(self.public_raw).hexdigest()
+
+    def sign(self, msg: bytes) -> str:
+        if self._priv is not None:
+            return base64.b64encode(self._priv.sign(msg)).decode()
+        return base64.b64encode(_pure_ed25519_sign(msg, self._seed)).decode()
+
+    def private_pem_encrypted(self, passphrase: str) -> str:
+        if self._priv is not None:
+            from cryptography.hazmat.primitives import serialization
+            pem = self._priv.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.BestAvailableEncryption(passphrase.encode("utf-8")))
+            return pem.decode()
+        # Fallback encrypted payload format with MAC authentication
+        salt = os.urandom(16)
+        key = hashlib.pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, 100000, 32)
+        mac = hashlib.sha256(key + b"mac-check" + self._seed).digest()
+        ks = hashlib.sha256(key + salt).digest()
+        ct = bytes(a ^ b for a, b in zip(self._seed, ks))
+        payload = {
+            "salt": base64.b64encode(salt).decode(),
+            "ct": base64.b64encode(ct).decode(),
+            "mac": base64.b64encode(mac).decode(),
+        }
+        return "-----BEGIN ENCRYPTED PRIVATE KEY-----\n" + base64.b64encode(json.dumps(payload).encode()).decode() + "\n-----END ENCRYPTED PRIVATE KEY-----"
+
+    @classmethod
+    def from_encrypted_pem(cls, pem: str, passphrase: str) -> "KeyPair":
+        try:
+            from cryptography.hazmat.primitives import serialization
+            priv = serialization.load_pem_private_key(
+                pem.encode(), password=passphrase.encode("utf-8"))
+            return cls(priv)
+        except ImportError:
+            lines = [l.strip() for l in pem.strip().splitlines() if not l.startswith("-----")]
+            raw = base64.b64decode("".join(lines))
+            payload = json.loads(raw.decode())
+            salt = base64.b64decode(payload["salt"])
+            ct = base64.b64decode(payload["ct"])
+            key = hashlib.pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, 100000, 32)
+            ks = hashlib.sha256(key + salt).digest()
+            seed = bytes(a ^ b for a, b in zip(ct, ks))
+            expected_mac = hashlib.sha256(key + b"mac-check" + seed).digest()
+            if "mac" in payload and expected_mac != base64.b64decode(payload["mac"]):
+                raise ValueError("bad passphrase")
+            return cls(None, seed=seed)
+        except Exception:
+            raise ValueError("bad passphrase or invalid key PEM")
+
+
+def verify_signature(public_b64: str, msg: bytes, sig_b64: str) -> bool:
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        pub = Ed25519PublicKey.from_public_bytes(base64.b64decode(public_b64))
+        pub.verify(base64.b64decode(sig_b64), msg)
+        return True
+    except ImportError:
+        pk = base64.b64decode(public_b64)
+        sig = base64.b64decode(sig_b64)
+        return _pure_ed25519_verify(sig, msg, pk)
     except Exception:
         return False
 
 
-class KeyManager:
-    """密钥管理: 生成、公钥指纹、签名与验签"""
-    def __init__(self, private_seed: Optional[bytes] = None):
-        if private_seed is None:
-            self.sk = os.urandom(32)
-        else:
-            self.sk = private_seed
-        self.pk = ed25519_publickey(self.sk)
-        self.fingerprint = hashlib.sha256(self.pk).hexdigest()
-
-    def sign(self, message: bytes) -> str:
-        sig_bytes = ed25519_sign(message, self.sk, self.pk)
-        return sig_bytes.hex()
-
-    @staticmethod
-    def verify(signature_hex: str, message: bytes, pubkey_bytes: bytes) -> bool:
-        try:
-            sig_bytes = bytes.fromhex(signature_hex)
-            return ed25519_verify(sig_bytes, message, pubkey_bytes)
-        except Exception:
-            return False
+def fingerprint_of(public_b64: str) -> str:
+    return hashlib.sha256(base64.b64decode(public_b64)).hexdigest()
 
 
-# ==========================================================
-# 5.7 哈希链账本实现 (JSONL 追加写)
-# ==========================================================
-class HashChainLedger:
-    def __init__(self, ledger_file_path: str):
-        self.path = ledger_file_path
-        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-        if not os.path.exists(self.path):
-            with open(self.path, 'w', encoding='utf-8') as f:
-                pass  # 创建空文件
-        self._cached_blocks: Optional[List[Dict[str, Any]]] = None
+# ---------------------------------------------------------------- 哈希链账本
 
-    def _load(self):
-        blocks = []
-        if os.path.exists(self.path):
-            with open(self.path, 'r', encoding='utf-8') as f:
+class Ledger:
+    """追加写 JSONL 哈希链。条目结构:
+    {seq, ts, type, payload, prev_hash, signer_fp, signer_pub, sig, hash}
+    hash = SHA-256(域标签 | prev_hash | canonical(除 sig/hash 外的全部字段))
+    sig  = 签名者对 hash 字节的 Ed25519 签名。
+    """
+
+    def __init__(self, path: str):
+        self.path = path
+        self.entries: list[dict] = []
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
-                        blocks.append(json.loads(line))
-        self._cached_blocks = blocks
+                        self.entries.append(json.loads(line))
 
-    def reload(self):
-        """重新从磁盘加载账本数据"""
-        self._load()
+    # -- 内部
+    @staticmethod
+    def _entry_hash(unsigned: dict) -> str:
+        prev = bytes.fromhex(unsigned["prev_hash"])
+        return hashlib.sha256(_ENTRY_DOMAIN + prev + canonical_bytes(unsigned)).hexdigest()
 
-    def get_all_blocks(self) -> List[Dict[str, Any]]:
-        if self._cached_blocks is None:
-            self._load()
-        return list(self._cached_blocks)
+    def head_hash(self) -> str:
+        return self.entries[-1]["hash"] if self.entries else GENESIS_HASH
 
-    def get_height(self) -> int:
-        if self._cached_blocks is None:
-            self._load()
-        return len(self._cached_blocks)
+    def next_seq(self) -> int:
+        return len(self.entries) + 1
 
-    def get_head_hash(self) -> str:
-        if self._cached_blocks is None:
-            self._load()
-        if not self._cached_blocks:
-            return GENESIS_HASH
-        return self._cached_blocks[-1]["block_hash"]
+    def latest_ts(self) -> str | None:
+        if not self.entries:
+            return None
+        # 按时间值比较 (不依赖字符串字典序, 混时区亦成立)
+        return max((e["ts"] for e in self.entries), key=parse_ts)
 
-    def append_block(self, entry_type: str, payload: Dict[str, Any], signer_pubkey_hex: str, signature_hex: str) -> Dict[str, Any]:
-        """
-        追加区块到账本:
-        - 验证签名有效性
-        - 链接上一区块哈希 prev_hash
-        - 计算当前区块哈希 block_hash
-        """
-        # 1. 验签
-        payload_bytes = canonical_serialize(payload)
-        pubkey_bytes = bytes.fromhex(signer_pubkey_hex)
-        if not KeyManager.verify(signature_hex, payload_bytes, pubkey_bytes):
-            raise ValueError("账本拒绝写入: 签名验签失败！")
-
-        if self._cached_blocks is None:
-            self._load()
-
-        height = len(self._cached_blocks) + 1
-        prev_hash = self._cached_blocks[-1]["block_hash"] if self._cached_blocks else GENESIS_HASH
-
-        block = {
-            "height": height,
-            "entry_type": entry_type,
-            "prev_hash": prev_hash,
+    # -- 写入 (写入前自验签名, 规范 §2 "账本验签才收录")
+    def append(self, entry_type: str, payload: dict, kp: KeyPair,
+               ts: str | None = None) -> dict:
+        # 回执随机数防重放 (规范 §8): 同一 nonce 的回执不得重复入账,
+        # 否则验真方可重放旧回执虚增授权已用次数。
+        if entry_type == "receipt":
+            nonce = payload.get("nonce")
+            for e in self.entries:
+                if (e["type"] == "receipt"
+                        and e["payload"].get("nonce") == nonce):
+                    raise ValueError("append: 回执随机数重复, 防重放拦截")
+        unsigned = {
+            "seq": self.next_seq(),
+            "ts": ts or now_iso(),
+            "type": entry_type,
             "payload": payload,
-            "signer_pubkey": signer_pubkey_hex,
-            "signature": signature_hex,
-            "block_time": int(time.time())
+            "prev_hash": self.head_hash(),
+            "signer_fp": kp.fingerprint,
+            "signer_pub": kp.public_b64,
         }
+        h = self._entry_hash(unsigned)
+        entry = {**unsigned, "sig": kp.sign(bytes.fromhex(h)), "hash": h}
+        if not verify_signature(entry["signer_pub"], bytes.fromhex(h), entry["sig"]):
+            raise ValueError("append: 签名自验失败, 拒绝收录")
+        with open(self.path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())  # 落盘确认, 防崩溃丢尾条
+        self.entries.append(entry)
+        return entry
 
-        # 计算区块哈希: SHA-256(canonical(block without block_hash))
-        block_bytes = canonical_serialize(block)
-        block["block_hash"] = hashlib.sha256(block_bytes).hexdigest()
-
-        # 追加写入 JSONL
-        with open(self.path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(block, ensure_ascii=False) + '\n')
-
-        self._cached_blocks.append(block)
-        return block
-
-    def verify_chain(self) -> Tuple[bool, str, int]:
-        """
-        全链校验:
-        - 校验所有区块 prev_hash 链接
-        - 校验区块自身的 block_hash
-        - 校验各条记录的 Ed25519 签名
-        返回: (is_valid, message, failure_height)
-        """
-        blocks = self.get_all_blocks()
-        if not blocks:
-            return True, "账本为空，创世态可信", 0
-
+    # -- 全链校验: 定位首个断裂序号
+    def verify_chain(self) -> tuple[bool, int | None, str]:
         prev = GENESIS_HASH
-        for idx, blk in enumerate(blocks):
-            h = blk.get("height", idx + 1)
-            # 1. 检查 prev_hash
-            if blk.get("prev_hash") != prev:
-                return False, f"高度 {h} 区块的前序哈希断裂（期望 {prev[:8]}，实为 {blk.get('prev_hash')[:8]}）", h
+        for e in self.entries:
+            if e["prev_hash"] != prev:
+                return False, e["seq"], "prev_hash 链接断裂"
+            unsigned = {k: e[k] for k in
+                        ("seq", "ts", "type", "payload", "prev_hash", "signer_fp", "signer_pub")}
+            if self._entry_hash(unsigned) != e["hash"]:
+                return False, e["seq"], "条目哈希不符 (内容被改)"
+            if fingerprint_of(e["signer_pub"]) != e["signer_fp"]:
+                return False, e["seq"], "签名者指纹与公钥不符"
+            if not verify_signature(e["signer_pub"], bytes.fromhex(e["hash"]), e["sig"]):
+                return False, e["seq"], "签名无效"
+            prev = e["hash"]
+        return True, None, ""
 
-            # 2. 检查区块哈希
-            actual_bh = blk.get("block_hash")
-            blk_copy = dict(blk)
-            blk_copy.pop("block_hash", None)
-            calc_bh = hashlib.sha256(canonical_serialize(blk_copy)).hexdigest()
-            if actual_bh != calc_bh:
-                return False, f"高度 {h} 区块自身哈希被篡改", h
+    # -- 查询
+    def by_type(self, entry_type: str) -> list[dict]:
+        return [e for e in self.entries if e["type"] == entry_type]
 
-            # 3. 检查签名
-            payload = blk.get("payload", {})
-            signer_pk = bytes.fromhex(blk.get("signer_pubkey", ""))
-            sig = blk.get("signature", "")
-            if not KeyManager.verify(sig, canonical_serialize(payload), signer_pk):
-                return False, f"高度 {h} 区块的 Ed25519 签名无效", h
-
-            prev = actual_bh
-
-        return True, f"全链 {len(blocks)} 个区块校验通过，哈希链与签名完整无损", 0
-
-    def is_certificate_revoked(self, cert_id: str) -> bool:
-        """检查凭证是否已被作废入账"""
-        for blk in self.get_all_blocks():
-            if blk.get("entry_type") == "作废" and blk.get("payload", {}).get("cert_id") == cert_id:
-                return True
-        return False
-
-    def query_by_cert_id(self, cert_id: str) -> Optional[Dict[str, Any]]:
-        """按凭证号查询最新登记记录"""
-        for blk in reversed(self.get_all_blocks()):
-            if blk.get("entry_type") == "登记" and blk.get("payload", {}).get("cert_id") == cert_id:
-                return blk
+    def find_registration(self, cert_id: str) -> dict | None:
+        for e in self.entries:
+            if e["type"] == "registration" and e["payload"].get("cert_id") == cert_id:
+                return e
         return None
-
-    def query_authorizations(self, cert_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """查询授权记录"""
-        res = []
-        for blk in self.get_all_blocks():
-            if blk.get("entry_type") == "授权":
-                p = blk.get("payload", {})
-                if cert_id is None or p.get("cert_id") == cert_id:
-                    res.append(p)
-        return res
-
-    def query_receipts(self, cert_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """查询验真回执记录"""
-        res = []
-        for blk in self.get_all_blocks():
-            if blk.get("entry_type") == "回执":
-                p = blk.get("payload", {})
-                if cert_id is None or p.get("cert_id") == cert_id:
-                    res.append(p)
-        return res
-
-    def query_key_announcements(self) -> List[Dict[str, Any]]:
-        """查询密钥公告 (失效与争议)"""
-        res = []
-        for blk in self.get_all_blocks():
-            if blk.get("entry_type") == "密钥公告":
-                res.append(blk.get("payload", {}))
-        return res
