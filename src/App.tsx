@@ -10,7 +10,8 @@ import {
   RefreshCw, Check, Sparkles, Terminal, FileCode2, ExternalLink,
   ChevronRight, ChevronLeft, Building2, UserCheck, Copy, Clock, Search,
   SlidersHorizontal, CheckSquare, Hash, Activity, Compass, AlertOctagon,
-  Eye, FileSearch, ArrowUpDown, ChevronDown, Award, QrCode as QrCodeIcon
+  Eye, FileSearch, ArrowUpDown, ChevronDown, Award, QrCode as QrCodeIcon,
+  Upload, X, FolderUp, Trash2
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { sm3Hash, sha256Hash, computeExactDualRoot, computeTextSimilarity } from './crypto';
@@ -18,6 +19,30 @@ import {
   extractFieldsFromText, runAudits, 
   RegistrationRecord, LedgerBlock, VerdictResult, AuditResult 
 } from './protocol';
+
+// 文件二进制与文本安全读取辅助函数
+const readFileAsArrayBuffer = (file: File): Promise<Uint8Array> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+const readFileAsText = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+};
+
+const isTextFormat = (filename: string): boolean => {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return ['txt', 'csv', 'md', 'json', 'log', 'xml'].includes(ext);
+};
 
 const REGISTRAR_DEFAULT = "示例新能源有限公司 · 财务部";
 const VERIFIER_DEFAULT = "合作银行 · 核验岗";
@@ -98,6 +123,11 @@ export default function App() {
   const [regPage, setRegPage] = useState(1);
   const [regFileName, setRegFileName] = useState("report.txt");
   const [regContent, setRegContent] = useState(DEMO_SAMPLES["report.txt"].text);
+  const [regFile, setRegFile] = useState<File | null>(null);
+  const [regBytes, setRegBytes] = useState<Uint8Array | null>(null);
+  const [regFileSize, setRegFileSize] = useState<number | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
+  const regFileInputRef = useRef<HTMLInputElement>(null);
   const [lastCert, setLastCert] = useState<RegistrationRecord | null>(null);
   const [certQrUrl, setCertQrUrl] = useState<string>("");
   const [certSearch, setCertSearch] = useState("");
@@ -108,11 +138,19 @@ export default function App() {
   const [verifySampleKey, setVerifySampleKey] = useState<string>("report_tampered.txt");
   const [verifyCustomText, setVerifyCustomText] = useState("");
   const [verifyMode, setVerifyMode] = useState<"sample" | "custom">("sample");
+  const [verFile, setVerFile] = useState<File | null>(null);
+  const [verBytes, setVerBytes] = useState<Uint8Array | null>(null);
+  const [verFileName, setVerFileName] = useState<string>("");
+  const [verFileSize, setVerFileSize] = useState<number | null>(null);
+  const [verError, setVerError] = useState<string | null>(null);
+  const verFileInputRef = useRef<HTMLInputElement>(null);
   const [verdict, setVerdict] = useState<VerdictResult | null>(null);
   const [verdictEvidenceTab, setVerdictEvidenceTab] = useState<"reasons" | "roots" | "perceptual" | "semantic" | "audits" | "report">("reasons");
   const [reportReviewed, setReportReviewed] = useState(false);
 
   // 批量验真
+  const [batchUploadedFiles, setBatchUploadedFiles] = useState<Array<{ name: string; bytes: Uint8Array; size: number; text: string }>>([]);
+  const batchFileInputRef = useRef<HTMLInputElement>(null);
   const [batchResults, setBatchResults] = useState<{
     items: Array<{ name: string; cert: string; grade: string; confidence: number; ms: number }>;
     stats: Record<string, number>;
@@ -225,73 +263,167 @@ export default function App() {
     handleLoadDemoData();
   }, []);
 
-  // 执行登记
+  // 处理登记文件上传选择 (支持拖拽/点击，支持 pdf, docx, xlsx, txt, csv, md, png, jpg, jpeg)
+  const handleRegisterFileChange = async (file: File) => {
+    setRegError(null);
+    if (file.size === 0) {
+      setRegError("SX-E01 空文件不可登记：文件大小为 0 字节");
+      return;
+    }
+    if (file.size > 500 * 1024 * 1024) {
+      setRegError("SX-E04 文件超限：单文件不可超过 500MB");
+      return;
+    }
+
+    try {
+      const bytes = await readFileAsArrayBuffer(file);
+      setRegFile(file);
+      setRegFileName(file.name);
+      setRegFileSize(file.size);
+      setRegBytes(bytes);
+
+      if (isTextFormat(file.name)) {
+        const text = await readFileAsText(file);
+        setRegContent(text);
+      } else {
+        setRegContent(`[已载入二进制文件: ${file.name}] 大小: ${file.size} 字节。按数玺规范 §14 进行精确双根 Merkle 树存证与降级留痕。`);
+      }
+    } catch (e: any) {
+      setRegError(`文件读取失败: ${e?.message || e}`);
+    }
+  };
+
+  // 执行登记 (支持已上传文件二进制流或文本正文)
   const handleRegister = async () => {
-    if (!regContent.trim()) return;
-    const bytes = new TextEncoder().encode(regContent);
-    const { sha256, sm3 } = await computeExactDualRoot(bytes);
-    const fields = extractFieldsFromText(regContent);
-    const audits = runAudits(fields);
-    const auditCodes = audits.filter(a => a.status !== "PASS").map(a => `${a.id}-${a.status}`);
+    setRegError(null);
+    let bytes: Uint8Array;
+    let textToUse = regContent;
 
-    const certSeq = (registrations.length + 1).toString().padStart(4, '0');
-    const randHex = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0');
-    const cert_id = `SX-${certSeq}-${randHex}`;
+    if (regBytes) {
+      bytes = regBytes;
+    } else {
+      if (!regContent.trim()) {
+        setRegError("SX-E01 空文件不可登记：请输入内容或选择要登记的文件");
+        return;
+      }
+      bytes = new TextEncoder().encode(regContent);
+    }
 
-    const fieldItems = fields.map(f => ({
-      key: f.key,
-      value: f.value,
-      salt: Math.random().toString(16).substring(2).padEnd(32, '0')
-    }));
+    if (bytes.length === 0) {
+      setRegError("SX-E01 空文件不可登记：文件大小为 0 字节");
+      return;
+    }
 
-    const rec: RegistrationRecord = {
-      cert_id,
-      spec_version: "1.3",
-      suite_id: "SXA1",
-      object_type: "单文件",
-      subject: actor,
-      pubkey_fingerprint: "9e1f16d4af37e6d5b8c02b20de4a3e2026",
-      environment: `数玺 v1.3 (Web引擎, 操作者: 经办)`,
-      filename: regFileName,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      exact_dual_root: { sha256, sm3 },
-      perceptual_hashes: ["b4a59687f0e1d2c3"],
-      semantic_root: sm3Hash(new TextEncoder().encode(regFileName + cert_id)),
-      field_keys: fields.map(f => f.key),
-      audit_results: auditCodes.length > 0 ? auditCodes : ["G1-PASS", "G2-PASS"],
-      status: "有效",
-      registered_text: regContent,
-      fields: fieldItems
-    };
+    try {
+      const { sha256, sm3 } = await computeExactDualRoot(bytes);
+      const isText = isTextFormat(regFileName) || !regBytes;
+      const fields = isText ? extractFieldsFromText(textToUse) : [];
+      const audits = fields.length > 0 ? runAudits(fields) : [];
+      const auditCodes = audits.filter(a => a.status !== "PASS").map(a => `${a.id}-${a.status}`);
 
-    const block: LedgerBlock = {
-      height: ledger.length + 1,
-      entry_type: "登记",
-      prev_hash: ledger.length > 0 ? ledger[ledger.length - 1].block_hash : "0000000000000000000000000000000000000000000000000000000000000000",
-      payload: rec,
-      signer_pubkey: "ed25519_demo_registrar_pubkey",
-      signature: "ed25519_sig_valid",
-      block_time: Math.floor(Date.now() / 1000),
-      block_hash: sm3Hash(new TextEncoder().encode(`block_${ledger.length + 1}`))
-    };
+      const certSeq = (registrations.length + 1).toString().padStart(4, '0');
+      const randHex = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0');
+      const cert_id = `SX-${certSeq}-${randHex}`;
 
-    setRegistrations([rec, ...registrations]);
-    setLedger([...ledger, block]);
-    setLastCert(rec);
-    generateQr(rec.cert_id, rec);
-    if (!selectedCertId) setSelectedCertId(cert_id);
+      const fieldItems = fields.map(f => ({
+        key: f.key,
+        value: f.value,
+        salt: Math.random().toString(16).substring(2).padEnd(32, '0')
+      }));
+
+      const rec: RegistrationRecord = {
+        cert_id,
+        spec_version: "1.3",
+        suite_id: "SXA1",
+        object_type: "单文件",
+        subject: actor,
+        pubkey_fingerprint: "9e1f16d4af37e6d5b8c02b20de4a3e2026",
+        environment: `数玺 v1.3 (Web引擎, 操作者: 经办)`,
+        filename: regFileName,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        exact_dual_root: { sha256, sm3 },
+        perceptual_hashes: ["b4a59687f0e1d2c3"],
+        semantic_root: sm3Hash(new TextEncoder().encode(regFileName + cert_id)),
+        field_keys: fields.map(f => f.key),
+        audit_results: auditCodes.length > 0 ? auditCodes : (isText ? ["G1-PASS", "G2-PASS"] : []),
+        status: "有效",
+        registered_text: isText ? textToUse : "",
+        fields: fieldItems
+      };
+
+      const block: LedgerBlock = {
+        height: ledger.length + 1,
+        entry_type: "登记",
+        prev_hash: ledger.length > 0 ? ledger[ledger.length - 1].block_hash : "0000000000000000000000000000000000000000000000000000000000000000",
+        payload: rec,
+        signer_pubkey: "ed25519_demo_registrar_pubkey",
+        signature: "ed25519_sig_valid",
+        block_time: Math.floor(Date.now() / 1000),
+        block_hash: sm3Hash(new TextEncoder().encode(`block_${ledger.length + 1}`))
+      };
+
+      setRegistrations([rec, ...registrations]);
+      setLedger([...ledger, block]);
+      setLastCert(rec);
+      generateQr(rec.cert_id, rec);
+      if (!selectedCertId) setSelectedCertId(cert_id);
+    } catch (e: any) {
+      setRegError(`登记失败: ${e?.message || e}`);
+    }
+  };
+
+  // 处理待验文件上传选择
+  const handleVerifyFileChange = async (file: File) => {
+    setVerError(null);
+    if (file.size === 0) {
+      setVerError("待验文件大小为 0 字节");
+      return;
+    }
+    try {
+      const bytes = await readFileAsArrayBuffer(file);
+      setVerFile(file);
+      setVerFileName(file.name);
+      setVerFileSize(file.size);
+      setVerBytes(bytes);
+      setVerifySampleKey("—");
+    } catch (e: any) {
+      setVerError(`文件读取失败: ${e?.message || e}`);
+    }
   };
 
   // 执行单件验真
   const handleVerify = async () => {
     const startTime = performance.now();
     setReportReviewed(false);
+    setVerError(null);
+
+    let testBytes: Uint8Array;
+    let testText: string = "";
+    let testFname: string = "";
+
+    if (verBytes && verFileName) {
+      testBytes = verBytes;
+      testFname = verFileName;
+      if (isTextFormat(verFileName)) {
+        try {
+          testText = new TextDecoder('utf-8').decode(verBytes);
+        } catch {
+          testText = "";
+        }
+      }
+    } else if (verifySampleKey !== "—" && DEMO_SAMPLES[verifySampleKey]) {
+      testText = DEMO_SAMPLES[verifySampleKey].text;
+      testBytes = new TextEncoder().encode(testText);
+      testFname = verifySampleKey;
+    } else {
+      setVerError("请上传待验文件或在下拉框中选用演示文件");
+      return;
+    }
 
     const targetCert = registrations.find(r => r.cert_id === selectedCertId);
-    const testText = verifyMode === "sample" ? DEMO_SAMPLES[verifySampleKey].text : verifyCustomText;
 
     if (!targetCert) {
-      const audits = runAudits(extractFieldsFromText(testText));
+      const audits = testText ? runAudits(extractFieldsFromText(testText)) : [];
       const hasFail = audits.some(a => a.status === "FAIL");
       const elapsed_ms = Math.max(1, Math.round(performance.now() - startTime));
       setVerdict({
@@ -344,12 +476,11 @@ export default function App() {
     }
 
     // 1. 精确哈希比对 (SHA-256 + SM3 双根)
-    const testBytes = new TextEncoder().encode(testText);
     const { sha256: testSha256, sm3: testSm3 } = await computeExactDualRoot(testBytes);
     const exactMatch = testSha256 === targetCert.exact_dual_root.sha256 && testSm3 === targetCert.exact_dual_root.sm3;
 
     // 2. 字段提取与差异比对
-    const testFields = extractFieldsFromText(testText);
+    const testFields = testText ? extractFieldsFromText(testText) : [];
     const testFieldMap = new Map(testFields.map(f => [f.key, f.value]));
     const diffs: Array<{ field: string; registered_val: string; current_val: string }> = [];
 
@@ -482,34 +613,125 @@ export default function App() {
     setVerdict(gradeResult);
   };
 
-  // 执行批量验真
+  // 批量文件加入列表
+  const handleBatchFilesChange = async (fileList: FileList | File[]) => {
+    const list = Array.from(fileList);
+    const loaded: Array<{ name: string; bytes: Uint8Array; size: number; text: string }> = [];
+    for (const f of list) {
+      if (f.size > 0) {
+        const bytes = await readFileAsArrayBuffer(f);
+        let text = "";
+        if (isTextFormat(f.name)) {
+          try {
+            text = new TextDecoder('utf-8').decode(bytes);
+          } catch {
+            text = "";
+          }
+        }
+        loaded.push({ name: f.name, bytes, size: f.size, text });
+      }
+    }
+    setBatchUploadedFiles(prev => [...prev, ...loaded]);
+  };
+
+  // 载入内置演示样本集（5份）
+  const handleLoadBatchDemoSamples = () => {
+    const keys = ["report.txt", "report_tampered.txt", "report_converted.txt", "fake.txt", "contract_bad.txt"];
+    const loaded = keys.map(k => {
+      const s = DEMO_SAMPLES[k];
+      const bytes = new TextEncoder().encode(s.text);
+      return { name: k, bytes, size: bytes.length, text: s.text };
+    });
+    setBatchUploadedFiles(loaded);
+  };
+
+  // 执行批量验真 (对齐 app.py: do_batch 逻辑，真实执行双散列比对与分诊)
   const handleRunBatchVerify = async () => {
     const start = performance.now();
-    const targetKeys = ["report.txt", "report_tampered.txt", "report_converted.txt", "contract_bad.txt", "fake.txt"];
-    const results: Array<{ name: string; cert: string; grade: string; confidence: number; ms: number }> = [];
-    const stats: Record<string, number> = { "甲级": 0, "乙级": 0, "丙级": 0, "丁级": 0, "待人工复核": 0 };
+    const filesToTest = batchUploadedFiles.length > 0 ? batchUploadedFiles : [
+      { name: "report.txt", bytes: new TextEncoder().encode(DEMO_SAMPLES["report.txt"].text), size: 128, text: DEMO_SAMPLES["report.txt"].text },
+      { name: "report_tampered.txt", bytes: new TextEncoder().encode(DEMO_SAMPLES["report_tampered.txt"].text), size: 128, text: DEMO_SAMPLES["report_tampered.txt"].text },
+      { name: "report_converted.txt", bytes: new TextEncoder().encode(DEMO_SAMPLES["report_converted.txt"].text), size: 135, text: DEMO_SAMPLES["report_converted.txt"].text },
+      { name: "fake.txt", bytes: new TextEncoder().encode(DEMO_SAMPLES["fake.txt"].text), size: 129, text: DEMO_SAMPLES["fake.txt"].text },
+      { name: "contract_bad.txt", bytes: new TextEncoder().encode(DEMO_SAMPLES["contract_bad.txt"].text), size: 110, text: DEMO_SAMPLES["contract_bad.txt"].text },
+    ];
 
-    for (const key of targetKeys) {
-      const s = DEMO_SAMPLES[key];
-      const targetCert = registrations.find(r => key.startsWith("report") ? r.filename === "report.txt" : r.filename === key) || registrations[0];
+    const results: Array<{ name: string; cert: string; grade: string; confidence: number; ms: number }> = [];
+    const stats: Record<string, number> = { "甲级": 0, "乙级": 0, "丙级": 0, "丁级": 0, "待人工复核": 0, "未登记": 0 };
+
+    for (const file of filesToTest) {
+      const itemStart = performance.now();
+      // 按文件名查找对应凭证
+      let targetCert = registrations.find(r => r.filename === file.name);
+      if (!targetCert && file.name.startsWith("report")) {
+        targetCert = registrations.find(r => r.filename === "report.txt");
+      }
+
+      let grade = "未登记";
+      let confidence = 50;
+
       if (targetCert) {
-        if (key === "report.txt") {
-          results.push({ name: key, cert: targetCert.cert_id, grade: "甲级", confidence: 99, ms: 2 });
-          stats["甲级"]++;
-        } else if (key === "report_tampered.txt") {
-          results.push({ name: key, cert: targetCert.cert_id, grade: "丁级", confidence: 95, ms: 3 });
-          stats["丁级"]++;
-        } else if (key === "report_converted.txt") {
-          results.push({ name: key, cert: targetCert.cert_id, grade: "乙级", confidence: 88, ms: 3 });
-          stats["乙级"]++;
-        } else if (key === "fake.txt") {
-          results.push({ name: key, cert: "未登记", grade: "丙级", confidence: 85, ms: 2 });
-          stats["丙级"]++;
+        if (targetCert.status === "已作废") {
+          grade = "已作废";
+          confidence = 100;
         } else {
-          results.push({ name: key, cert: targetCert.cert_id, grade: "甲级", confidence: 99, ms: 2 });
-          stats["甲级"]++;
+          const { sha256, sm3 } = await computeExactDualRoot(file.bytes);
+          const exactMatch = sha256 === targetCert.exact_dual_root.sha256 && sm3 === targetCert.exact_dual_root.sm3;
+
+          const testFields = file.text ? extractFieldsFromText(file.text) : [];
+          const testFieldMap = new Map(testFields.map(f => [f.key, f.value]));
+          const diffs: Array<{ field: string; registered_val: string; current_val: string }> = [];
+
+          (targetCert.fields || []).forEach(rf => {
+            const cv = testFieldMap.get(rf.key);
+            if (cv !== undefined && cv !== rf.value) {
+              diffs.push({ field: rf.key, registered_val: rf.value, current_val: cv });
+            }
+          });
+
+          const testAudits = runAudits(testFields);
+          const auditFails = testAudits.filter(a => a.status === "FAIL");
+          const textSim = computeTextSimilarity(targetCert.registered_text || "", file.text);
+
+          if (exactMatch) {
+            grade = "甲级";
+            confidence = 99;
+          } else if (diffs.length > 0) {
+            grade = "丁级";
+            confidence = 96;
+          } else if (auditFails.length > 0) {
+            grade = "丙级";
+            confidence = 88;
+          } else if (textSim.score > 0.85) {
+            grade = "乙级";
+            confidence = 91;
+          } else {
+            grade = "待人工复核";
+            confidence = 60;
+          }
+        }
+      } else {
+        const testFields = file.text ? extractFieldsFromText(file.text) : [];
+        const testAudits = runAudits(testFields);
+        const hasFail = testAudits.some(a => a.status === "FAIL");
+        if (hasFail) {
+          grade = "丙级";
+          confidence = 85;
+        } else {
+          grade = "未登记";
+          confidence = 50;
         }
       }
+
+      const itemMs = Math.max(1, Math.round((performance.now() - itemStart) * 10) / 10);
+      results.push({
+        name: file.name,
+        cert: targetCert ? targetCert.cert_id : "—",
+        grade,
+        confidence,
+        ms: itemMs
+      });
+      stats[grade] = (stats[grade] || 0) + 1;
     }
 
     setBatchResults({
@@ -790,16 +1012,20 @@ export default function App() {
             {/* 视图 A: 指纹录入与公文签发 (colL 7 : colR 5) */}
             {regSubView === "input" && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* 左栏 (7/12)：文件上传与明文录入 */}
+                {/* 左栏 (7/12)：文件上传与明文录入 (完全对齐 app.py: reg_up 与 st.caption) */}
                 <div className="lg:col-span-7 paper-card rounded-2xl p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-[#F0EBE0] pb-3">
-                    <span className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-[#C23531]" /> 选择要登记的文件或输入内容
+                    <span className="text-xs font-bold text-[#1F2937] flex items-center gap-1.5 font-serif">
+                      <FileText className="w-3.5 h-3.5 text-[#C23531]" /> 选择要登记的文件
                     </span>
                     <div className="flex items-center gap-1.5 text-xs">
-                      <span className="text-[#78716C] text-[11px]">载入范本:</span>
+                      <span className="text-[#78716C] text-[11px]">选用范本:</span>
                       <button
+                        type="button"
                         onClick={() => {
+                          setRegFile(null);
+                          setRegBytes(null);
+                          setRegFileSize(null);
                           setRegFileName("report.txt");
                           setRegContent(DEMO_SAMPLES["report.txt"].text);
                         }}
@@ -808,7 +1034,11 @@ export default function App() {
                         经营报表
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
+                          setRegFile(null);
+                          setRegBytes(null);
+                          setRegFileSize(null);
                           setRegFileName("contract_bad.txt");
                           setRegContent(DEMO_SAMPLES["contract_bad.txt"].text);
                         }}
@@ -819,24 +1049,88 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">文件名</label>
-                    <input
-                      type="text"
-                      value={regFileName}
-                      onChange={e => setRegFileName(e.target.value)}
-                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
+                  {/* 真实文件上传拖拽区域 (对应 app.py: st.file_uploader) */}
+                  <div 
+                    onClick={() => regFileInputRef.current?.click()}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleRegisterFileChange(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    className="border-1.5 border-dashed border-[#D97706]/60 hover:border-[#C23531] bg-[#FAF8F3]/60 hover:bg-[#FAF8F3] rounded-xl p-4 text-center cursor-pointer transition-all group"
+                  >
+                    <input 
+                      type="file" 
+                      ref={regFileInputRef} 
+                      className="hidden" 
+                      accept=".pdf,.docx,.xlsx,.txt,.csv,.md,.png,.jpg,.jpeg" 
+                      onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleRegisterFileChange(e.target.files[0]);
+                        }
+                      }} 
                     />
+                    <Upload className="w-5 h-5 mx-auto text-[#C23531] group-hover:scale-110 transition-transform mb-1.5" />
+                    <div className="text-xs font-semibold text-[#1F2937]">
+                      点击或拖拽本地文件至此处上传登记
+                    </div>
+                    <div className="text-[11px] text-[#78716C] mt-0.5">
+                      支持 PDF, DOCX, XLSX, TXT, CSV, MD, PNG, JPG (≤500MB)
+                    </div>
+                    {regFile && (
+                      <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 bg-white border border-[#DCD5C6] rounded-lg text-xs font-mono text-[#1F2937] shadow-2xs">
+                        <FileText className="w-3.5 h-3.5 text-[#C23531]" />
+                        <span className="font-semibold">{regFile.name}</span>
+                        <span className="text-[#78716C]">· {regFile.size} 字节</span>
+                        <button 
+                          type="button" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRegFile(null);
+                            setRegBytes(null);
+                            setRegFileSize(null);
+                          }}
+                          className="ml-1 text-[#78716C] hover:text-[#C23531]"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">文件正文内容（本地完成双散列与分词，原文不入链）</label>
-                    <textarea
-                      rows={8}
-                      value={regContent}
-                      onChange={e => setRegContent(e.target.value)}
-                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-3 text-xs font-mono text-[#1F2937] leading-relaxed focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
-                    />
+                  {/* 错误提示横幅 */}
+                  {regError && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+                      <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{regError}</span>
+                    </div>
+                  )}
+
+                  {/* 文件名与正文预览 */}
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">文件名</label>
+                      <input
+                        type="text"
+                        value={regFileName}
+                        onChange={e => setRegFileName(e.target.value)}
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">
+                        文件内容（本地完成 SHA-256 + SM3 双散列 Merkle 树计算，原件明文不进账本）
+                      </label>
+                      <textarea
+                        rows={6}
+                        value={regContent}
+                        onChange={e => setRegContent(e.target.value)}
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl p-3 text-xs font-mono text-[#1F2937] leading-relaxed focus:outline-none focus:border-[#C23531] focus:bg-white transition-all"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-[#F0EBE0]">
@@ -1092,47 +1386,121 @@ export default function App() {
             {/* 视图 A: 单件深挖 */}
             {verifySubView === "single" && (
               <div className="space-y-4">
-                {/* 控制条 (对应 app.py row1 & row2) */}
-                <div className="paper-card rounded-2xl p-4 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                  <div className="md:col-span-5">
-                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">选择凭证</label>
-                    <select
-                      value={selectedCertId}
-                      onChange={e => setSelectedCertId(e.target.value)}
-                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531]"
-                    >
-                      {registrations.map(r => (
-                        <option key={r.cert_id} value={r.cert_id}>
-                          {r.cert_id} · {r.filename}
-                        </option>
-                      ))}
-                      {registrations.length === 0 && <option value="">尚无登记记录，先去登记</option>}
-                    </select>
+                {/* 控制条 (完全对齐 app.py row1 [7, 5] & row2 [7, 5]: 选择凭证/选用演示/上传待验/开始验真) */}
+                <div className="paper-card rounded-2xl p-5 space-y-4">
+                  {/* Row 1: 选择凭证 (7/12) + 或选用演示文件 (5/12) */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-7">
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">选择凭证</label>
+                      <select
+                        value={selectedCertId}
+                        onChange={e => setSelectedCertId(e.target.value)}
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-2 text-xs font-mono text-[#1F2937] focus:outline-none focus:border-[#C23531]"
+                      >
+                        {registrations.map(r => (
+                          <option key={r.cert_id} value={r.cert_id}>
+                            {r.cert_id} · {r.filename}
+                          </option>
+                        ))}
+                        {registrations.length === 0 && <option value="">尚无登记记录，先去登记</option>}
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-5">
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">或选用演示文件</label>
+                      <select
+                        value={verifySampleKey}
+                        onChange={e => {
+                          setVerifySampleKey(e.target.value);
+                          if (e.target.value !== "—") {
+                            setVerFile(null);
+                            setVerBytes(null);
+                            setVerFileName("");
+                            setVerFileSize(null);
+                          }
+                        }}
+                        className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-2 text-xs text-[#1F2937] focus:outline-none focus:border-[#C23531]"
+                      >
+                        <option value="—">— (优先使用下方上传文件)</option>
+                        {Object.entries(DEMO_SAMPLES).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v.label} [{v.tag}]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="md:col-span-5">
-                    <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">或选用演示文件</label>
-                    <select
-                      value={verifySampleKey}
-                      onChange={e => setVerifySampleKey(e.target.value)}
-                      className="w-full bg-[#FAF8F3] border border-[#DCD5C6] rounded-xl px-3 py-1.5 text-xs text-[#1F2937] focus:outline-none focus:border-[#C23531]"
-                    >
-                      {Object.entries(DEMO_SAMPLES).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v.label} [{v.tag}]
-                        </option>
-                      ))}
-                    </select>
+                  {/* Row 2: 上传待验文件 (7/12) + 开始验真按钮 (5/12) */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1 border-t border-[#F0EBE0]">
+                    <div className="md:col-span-7">
+                      <label className="text-[11px] font-semibold text-[#4B5563] block mb-1">上传待验文件</label>
+                      <div 
+                        onClick={() => verFileInputRef.current?.click()}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => {
+                          e.preventDefault();
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleVerifyFileChange(e.dataTransfer.files[0]);
+                          }
+                        }}
+                        className="border border-dashed border-[#DCD5C6] hover:border-[#C23531] bg-[#FAF8F3] hover:bg-white rounded-xl px-3 py-2 flex items-center justify-between cursor-pointer transition-all"
+                      >
+                        <input 
+                          type="file" 
+                          ref={verFileInputRef} 
+                          className="hidden" 
+                          onChange={e => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleVerifyFileChange(e.target.files[0]);
+                            }
+                          }} 
+                        />
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <Upload className="w-4 h-4 text-[#C23531] shrink-0" />
+                          <div className="truncate">
+                            <span className="text-xs font-medium text-[#1F2937]">
+                              {verFile ? verFile.name : "点击或拖拽文件上传待验"}
+                            </span>
+                            <span className="text-[11px] text-[#78716C] ml-2">
+                              {verFile ? `· ${verFile.size} 字节` : "（支持各类原件、篡改件、转换件或无存证件）"}
+                            </span>
+                          </div>
+                        </div>
+                        {verFile && (
+                          <button 
+                            type="button" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVerFile(null);
+                              setVerBytes(null);
+                              setVerFileName("");
+                              setVerFileSize(null);
+                            }}
+                            className="p-1 text-[#78716C] hover:text-[#C23531] rounded shrink-0"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-5 pt-4 md:pt-4">
+                      <button
+                        onClick={handleVerify}
+                        className="w-full py-2 px-5 bg-[#C23531] hover:bg-[#B91C1C] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <FileCheck className="w-4 h-4" /> 开始验真
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="md:col-span-2">
-                    <button
-                      onClick={handleVerify}
-                      className="w-full py-1.5 px-4 bg-[#C23531] hover:bg-[#B91C1C] text-white font-semibold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all"
-                    >
-                      <FileCheck className="w-3.5 h-3.5" /> 开始验真
-                    </button>
-                  </div>
+                  {verError && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center gap-2">
+                      <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{verError}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 验真结论卡 (完全对应 app.py 中的 grade_hero) */}
@@ -1302,38 +1670,119 @@ export default function App() {
               </div>
             )}
 
-            {/* 视图 B: 批量验真 (完全对齐 app.py line 679 批量验真) */}
+            {/* 视图 B: 批量验真 (完全对齐 app.py line 679 批量上传与 do_batch) */}
             {verifySubView === "batch" && (
               <div className="paper-card rounded-2xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F0EBE0] pb-3">
                   <div>
                     <h3 className="text-sm font-bold text-[#1F2937] font-serif">批量验真</h3>
                     <p className="text-xs text-[#78716C] mt-0.5">一次上传多份文件：按文件名自动匹配凭证，五十份也是一张表。</p>
                   </div>
-                  <button
-                    onClick={handleRunBatchVerify}
-                    className="px-3.5 py-1.5 bg-[#C23531] hover:bg-[#B91C1C] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" /> 开始批量验真
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleLoadBatchDemoSamples}
+                      className="px-3 py-1.5 bg-[#FAF8F3] hover:bg-[#F0EBE0] border border-[#DCD5C6] rounded-xl text-xs font-medium text-[#374151] flex items-center gap-1.5 shadow-2xs transition-all"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-[#D97706]" /> 载入演示测试集 (5份)
+                    </button>
+                    <button
+                      onClick={handleRunBatchVerify}
+                      className="px-4 py-1.5 bg-[#C23531] hover:bg-[#B91C1C] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <FileCheck className="w-3.5 h-3.5" /> 开始批量验真
+                    </button>
+                  </div>
                 </div>
 
+                {/* 批量上传拖拽区域 (对应 app.py: batch_up, accept_multiple_files=True) */}
+                <div 
+                  onClick={() => batchFileInputRef.current?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleBatchFilesChange(e.dataTransfer.files);
+                    }
+                  }}
+                  className="border-1.5 border-dashed border-[#D97706]/60 hover:border-[#C23531] bg-[#FAF8F3]/60 hover:bg-[#FAF8F3] rounded-xl p-4 text-center cursor-pointer transition-all group"
+                >
+                  <input 
+                    type="file" 
+                    ref={batchFileInputRef} 
+                    multiple 
+                    className="hidden" 
+                    onChange={e => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleBatchFilesChange(e.target.files);
+                      }
+                    }} 
+                  />
+                  <FolderUp className="w-5 h-5 mx-auto text-[#C23531] group-hover:scale-110 transition-transform mb-1.5" />
+                  <div className="text-xs font-semibold text-[#1F2937]">
+                    点击或拖拽批量文件至此处上传
+                  </div>
+                  <div className="text-[11px] text-[#78716C] mt-0.5">
+                    支持同时选择或拖拽多个待验文件，系统将按文件名自动与账本凭证进行穿透比对
+                  </div>
+                </div>
+
+                {/* 待验队列文件列表展示 */}
+                {batchUploadedFiles.length > 0 && (
+                  <div className="p-3 bg-[#FAF8F3] border border-[#E7E2D6] rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-[#1F2937]">
+                        已选待验文件 ({batchUploadedFiles.length} 份)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setBatchUploadedFiles([])}
+                        className="text-[11px] text-[#C23531] hover:text-[#991B1B] flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" /> 清空列表
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                      {batchUploadedFiles.map((f, i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#DCD5C6] rounded-lg text-xs font-mono text-[#374151]">
+                          <span className="font-medium text-[#1F2937]">{f.name}</span>
+                          <span className="text-[#78716C]">({f.size} B)</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBatchUploadedFiles(prev => prev.filter((_, idx) => idx !== i));
+                            }}
+                            className="text-[#78716C] hover:text-[#C23531] ml-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {batchResults && (
-                  <div className="space-y-4">
-                    {/* 统计胶囊片 (对应 app.py batch-chips) */}
+                  <div className="space-y-4 pt-1">
+                    {/* 统计胶囊片 (对应 app.py batch-chips: 等级与数量) */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold">
-                        甲级 × {batchResults.stats["甲级"]}
-                      </span>
-                      <span className="px-3 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 font-semibold">
-                        乙级 × {batchResults.stats["乙级"]}
-                      </span>
-                      <span className="px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
-                        丙级 × {batchResults.stats["丙级"]}
-                      </span>
-                      <span className="px-3 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-semibold">
-                        丁级 × {batchResults.stats["丁级"]}
-                      </span>
+                      {Object.entries(batchResults.stats).filter(([_, n]) => n > 0).map(([g, n]) => {
+                        const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                          "甲级": { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-800" },
+                          "乙级": { bg: "bg-sky-50", border: "border-sky-200", text: "text-sky-800" },
+                          "丙级": { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-800" },
+                          "丁级": { bg: "bg-rose-50", border: "border-rose-200", text: "text-rose-800" },
+                          "待人工复核": { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-800" },
+                          "未登记": { bg: "bg-stone-100", border: "border-stone-300", text: "text-stone-700" }
+                        };
+                        const c = colorMap[g] || { bg: "bg-stone-50", border: "border-stone-200", text: "text-stone-700" };
+                        return (
+                          <span key={g} className={`px-3 py-1 rounded-lg ${c.bg} border ${c.border} ${c.text} font-semibold`}>
+                            {g} × {n}
+                          </span>
+                        );
+                      })}
                       <span className="text-xs font-mono text-[#78716C] ml-auto">
                         <strong>{batchResults.items.length} 份</strong> · 总耗时 {batchResults.totalMs} ms
                       </span>
@@ -1344,11 +1793,11 @@ export default function App() {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-[#FAF8F3] text-[#4B5563] text-[11px] font-semibold border-b border-[#E7E2D6]">
                           <tr>
-                            <th className="py-2.5 px-3.5">待验样例</th>
-                            <th className="py-2.5 px-3.5 font-mono">锚定凭证</th>
-                            <th className="py-2.5 px-3.5">验真分级</th>
-                            <th className="py-2.5 px-3.5">置信把握</th>
-                            <th className="py-2.5 px-3.5 text-right font-mono">耗时</th>
+                            <th className="py-2.5 px-3.5">文件</th>
+                            <th className="py-2.5 px-3.5 font-mono">凭证</th>
+                            <th className="py-2.5 px-3.5">等级</th>
+                            <th className="py-2.5 px-3.5">把握</th>
+                            <th className="py-2.5 px-3.5 text-right font-mono">耗时ms</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#F0EBE0]">
@@ -1361,13 +1810,15 @@ export default function App() {
                                   item.grade === "甲级" ? "text-emerald-700 bg-emerald-50 border border-emerald-200" :
                                   item.grade === "乙级" ? "text-sky-700 bg-sky-50 border border-sky-200" :
                                   item.grade === "丙级" ? "text-amber-700 bg-amber-50 border border-amber-200" :
-                                  "text-rose-700 bg-rose-50 border border-rose-200"
+                                  item.grade === "丁级" ? "text-rose-700 bg-rose-50 border border-rose-200" :
+                                  item.grade === "待人工复核" ? "text-purple-700 bg-purple-50 border border-purple-200" :
+                                  "text-stone-700 bg-stone-100 border border-stone-300"
                                 }`}>
                                   {item.grade}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3.5 font-mono text-[#374151]">{item.confidence}%</td>
-                              <td className="py-2.5 px-3.5 text-right font-mono text-[#78716C]">{item.ms} ms</td>
+                              <td className="py-2.5 px-3.5 text-right font-mono text-[#78716C]">{item.ms}</td>
                             </tr>
                           ))}
                         </tbody>
